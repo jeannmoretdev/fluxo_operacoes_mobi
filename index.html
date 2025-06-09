@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluxo de Propostas</title>
+    <!-- CSS EXISTENTES - MANTIDOS TODOS -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/print-reports.css">
+    <link rel="stylesheet" href="css/tv-mode.css">
+    <link rel="stylesheet" href="css/excedido.css">
+    
+    <!-- NOVOS CSS ADICIONADOS - SEM REMOVER OS ANTERIORES -->
+    <link rel="stylesheet" href="css/borderos-detail.css">
+    <link rel="stylesheet" href="css/acumulado-detail.css">
+    
+    <!-- Links externos existentes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <!-- USAR A MESMA BIBLIOTECA DO REPORT-SERVICE -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" 
+            onerror="console.error('Erro ao carregar jsPDF do CDN principal')"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Adicionar logo após a abertura da div container -->
+        <button class="tv-mode-toggle" id="tv-mode-toggle" title="Alternar modo TV">
+            <i class="fas fa-tv"></i>
+        </button>
+        <header>
+            <div class="header-title-section">
+                <h1>Fluxo de Propostas</h1>
+                <div class="report-dropdown">
+                    <button id="report-button" class="report-button">
+                        <i class="fas fa-file-pdf"></i> Relatórios
+                        <i class="fas fa-caret-down"></i>
+                    </button>
+                    <div class="report-dropdown-content">
+                        <!-- Adicionar dentro do dropdown de relatórios -->
+                        <button id="pdf-flow-button" class="dropdown-item">
+                            <i class="fas fa-file-pdf"></i> PDF de Fluxo de Operações
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="auto-refresh-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="auto-refresh-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Atualização automática</span>
+                </div>
+                <div class="last-update">
+                    Última atualização: <span id="update-time">--:--:--</span>
+                    <button id="manual-refresh" class="refresh-button" title="Atualizar agora">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Adicionar após o header e antes do error-message -->
+        <div class="tv-mode-header">
+            <div class="tv-date-time">
+                <div class="tv-date" id="tv-date">Data: --/--/----</div>
+                <div class="tv-time" id="tv-time">Hora: --:--:--</div>
+            </div>
+            <div class="tv-font-controls">
+                <span class="tv-font-size-label">Tamanho da fonte:</span>
+                <button class="tv-font-button" id="decrease-font">-</button>
+                <span class="tv-font-size-value" id="font-size-value">16</span>
+                <button class="tv-font-button" id="increase-font">+</button>
+            </div>
+        </div>
+
+        <div id="error-message" class="error-message">
+            <!-- Mensagens de erro serão exibidas aqui -->
+        </div>
+
+        <div class="filters">
+            <div class="filter-group date-range-group">
+                <label for="date-range">Período:</label>
+                <input type="text" id="date-range" placeholder="Selecione o período...">
+                <div class="date-presets">
+                    <button class="date-preset" data-days="0">Hoje</button>
+                    <button class="date-preset" data-days="1">Ontem</button>
+                    <button class="date-preset" data-days="7">Últimos 7 dias</button>
+                    <button class="date-preset" data-days="30">Últimos 30 dias</button>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label for="status-filter">Status:</label>
+                <select id="status-filter">
+                    <option value="todos">Todos os Status</option>
+                    <option value="1 - DIGITANDO">DIGITANDO</option>
+                    <option value="2 - AGUARD. ANÁLISE">AGUARD. ANÁLISE</option>
+                    <option value="3 - OPER. ANALISANDO">OPER. ANALISANDO</option>
+                    <option value="4 - COMITÊ">COMITÊ</option>
+                    <option value="5 - Q CERT. ASSINAT.">Q CERT. ASSINAT.</option>
+                    <option value="6 - PAGO">PAGO</option>
+                    <option value="CEDENTE DESISTIU">CEDENTE DESISTIU</option>
+                    <option value="CHECAGEM">CHECAGEM</option>
+                    <option value="RECUSADO">RECUSADO</option>
+                    <option value="PENDÊNCIA">PENDÊNCIA</option>
+                    <option value="POSTERGADO">POSTERGADO</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="sort-by">Ordenar por:</label>
+                <select id="sort-by" class="form-control">
+                    <option value="data_desc">Data (mais recente)</option>
+                    <option value="data_asc">Data (mais antiga)</option>
+                    <option value="tempo_total_desc">Tempo Total (maior)</option>
+                    <option value="tempo_total_asc">Tempo Total (menor)</option>
+                    <option value="hora_entrada_desc">Hora entrada (mais recente)</option>
+                    <option value="hora_entrada_asc">Hora entrada (mais antiga)</option>
+                    <option value="numero_desc">Número (maior)</option>
+                    <option value="numero_asc">Número (menor)</option>
+                    <option value="cedente_asc">Cedente (A-Z)</option>
+                    <option value="cedente_desc">Cedente (Z-A)</option>
+                    <option value="analise_desc">Hora Análise (mais recente)</option>
+                    <option value="analise_asc">Hora Análise (mais antiga)</option>
+                    <option value="checagem_desc">Hora Checagem (mais recente)</option>
+                    <option value="checagem_asc">Hora Checagem (mais antiga)</option>
+                    <option value="certificacao_desc">Hora Certificação (mais recente)</option>
+                    <option value="certificacao_asc">Hora Certificação (mais antiga)</option>
+                    <option value="pagamento_desc">Hora Pagamento (mais recente)</option>
+                    <option value="pagamento_asc">Hora Pagamento (mais antiga)</option>
+                    <option value="status_asc">Status (início para fim)</option>
+                    <option value="status_desc">Status (fim para início)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="cedente-filter">Cedente:</label>
+                <input type="text" id="cedente-filter" placeholder="Filtrar por cedente...">
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stats-grid">
+                <!-- Operações -->
+                <div class="stats-section operations">
+                    <h3 class="stats-section-title">
+                        <i class="fas fa-tasks"></i> Operações
+                    </h3>
+                    <div class="stats-cards">
+                        <div class="stat-card primary">
+                            <div class="stat-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Total</span>
+                                <span class="stat-value" id="total-propostas">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Pagas</span>
+                                <span class="stat-value" id="total-pagas">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card warning">
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Processando</span>
+                                <span class="stat-value" id="total-processamento">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card info">
+                            <div class="stat-icon">
+                                <i class="fas fa-stopwatch"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Tempo Médio</span>
+                                <span class="stat-value" id="tempo-medio">0 min</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Financeiro -->
+                <div class="stats-section financial">
+                    <h3 class="stats-section-title">
+                        <i class="fas fa-dollar-sign"></i> Financeiro
+                    </h3>
+                    <div class="stats-cards">
+                        <!-- ALTERADO: Borderôs Pagos - de stat-box para stat-card -->
+                        <div class="stat-card money">
+                            <div class="stat-icon">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label" id="borderos-label">Borderôs Pagos</span>
+                                <span class="stat-value" id="soma-valores-aprovados">R$ 0,00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card target">
+                            <div class="stat-icon">
+                                <i class="fas fa-bullseye"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label" id="meta-mensal-label">Meta Mensal</span>
+                                <span class="stat-value" id="meta-mensal">R$ 0,00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card daily">
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-day"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label" id="meta-diaria-label">Meta Diária</span>
+                                <span class="stat-value" id="meta-diaria">R$ 0,00</span>
+                            </div>
+                        </div>
+                        
+                        <!-- NOVO: Acumulado do Mês - como stat-card -->
+                        <div class="stat-card accumulated">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label" id="valor-acumulado-label">Acumulado do Mês</span>
+                                <span class="stat-value" id="valor-acumulado-mes">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="propostas-table">
+                <thead>
+                    <tr>
+                        <th class="sortable text-center" data-sort="data">Data<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="tempo_total">Tempo Total<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="hora_entrada">ENTRADA GER<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="numero">Nº<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="cedente">Cedente<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="analise">ANALISTA AUTO<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="pendencia">PENDÊNCIA<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="checagem">CHECAGEM<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="certificacao">QCERT.<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="pagamento">PAGO<span class="sort-icon"></span></th>
+                        <th class="sortable text-center" data-sort="status">Status<span class="sort-icon"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="propostas-body">
+                    <!-- Dados serão inseridos aqui via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Adicionar após a div table-container e antes do loading-overlay -->
+        <div class="excedido-container" id="excedido-container">
+            <h2 class="section-title">Operações PAGAS com Tempo Excedido (> 2:30h)</h2>
+            <div class="observations-list" id="excedido-list">
+                <!-- O conteúdo será inserido dinamicamente via JavaScript -->
+            </div>
+        </div>
+        
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Carregando dados...</div>
+        </div>
+        
+        <!-- Modal de relatório para visualização -->
+        <div class="report-modal" id="report-modal">
+            <div class="report-modal-content">
+                <div class="report-modal-header">
+                    <div class="report-modal-title">Relatório de Observações</div>
+                    <button class="report-modal-close" id="report-modal-close">&times;</button>
+                </div>
+                <div id="report-content">
+                    <!-- O conteúdo do relatório será inserido aqui -->
+                </div>
+                <div class="report-actions">
+                    <button class="report-pdf" id="report-pdf">
+                        <i class="fas fa-file-pdf"></i> Gerar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    
+    <!-- PDF Utils ANTES dos outros scripts -->
+    <script src="js/pdf-utils.js"></script>
+    
+    <!-- Scripts existentes -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <!-- ADICIONAR para desenvolvimento/teste -->
+    <script src="js/test-pdf.js"></script>
+    <!-- Adicionar antes dos outros scripts -->
+    <script src="js/metas-config.js"></script>
+    <!-- Adicionar o serviço de cedentes antes do data-service -->
+    <script src="js/cedente-service.js"></script>
+    <script src="js/data-service.js"></script>
+    <script src="js/ui-components.js"></script>
+    <script src="js/event-handlers.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/user-filter.js"></script>
+    <!-- Ordem correta de carregamento -->
+    <script src="js/report-service.js"></script>
+    <script src="js/report-handlers.js"></script>
+    <script src="js/cedente-diagnostico.js"></script>
+    <script src="js/filtro-fix.js"></script>
+    <!-- Substituir o script existente no final do body por este -->
+    <script>
+        // Garantir que o modo TV seja configurado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Usar uma variável para controlar se o modo TV já foi configurado
+            if (window.modoTVConfigurado) {
+                console.log('Modo TV já foi configurado anteriormente');
+                return;
+            }
+            
+            window.modoTVConfigurado = true;
+            
+            setTimeout(function() {
+                if (typeof configurarModoTVAprimorado === 'function') {
+                    configurarModoTVAprimorado();
+                    console.log('Modo TV aprimorado configurado via timeout');
+                } else {
+                    console.error('Função configurarModoTVAprimorado não encontrada após timeout');
+                    
+                    // Implementação de fallback simplificada
+                    const botaoTV = document.getElementById('tv-mode-toggle') || document.createElement('button');
+                    botaoTV.id = 'tv-mode-toggle';
+                    botaoTV.className = 'tv-mode-toggle';
+                    botaoTV.title = 'Alternar modo TV';
+                    
+                    // Verificar se o modo TV já está ativo
+                    const modoTVAtivo = localStorage.getItem('modo-tv') === 'ativo';
+                    if (modoTVAtivo) {
+                        document.body.classList.add('tv-mode');
+                        botaoTV.innerHTML = '<i class="fas fa-desktop"></i> Modo Normal';
+                    } else {
+                        botaoTV.innerHTML = '<i class="fas fa-tv"></i> Modo TV';
+                    }
+                    
+                    if (!document.getElementById('tv-mode-toggle')) {
+                        document.body.appendChild(botaoTV);
+                    }
+                    
+                    // Remover event listeners existentes
+                    const novoBtn = botaoTV.cloneNode(true);
+                    botaoTV.parentNode.replaceChild(novoBtn, botaoTV);
+                    
+                    // Adicionar novo event listener
+                    novoBtn.addEventListener('click', function() {
+                        document.body.classList.toggle('tv-mode');
+                        this.innerHTML = document.body.classList.contains('tv-mode') 
+                            ? '<i class="fas fa-desktop"></i> Modo Normal' 
+                            : '<i class="fas fa-tv"></i> Modo TV';
+                        
+                        // Salvar a preferência
+                        const novoEstado = document.body.classList.contains('tv-mode') ? 'ativo' : 'inativo';
+                        localStorage.setItem('modo-tv', novoEstado);
+                        
+                        // Forçar um redimensionamento da tabela
+                        setTimeout(() => {
+                            window.dispatchEvent(new Event('resize'));
+                            
+                            // Apenas renderizar se a tabela estiver vazia
+                            const tbody = document.querySelector('#propostas-table tbody');
+                            if (tbody && tbody.children.length === 0) {
+                                if (typeof filtrarPropostas === 'function' && typeof ordenarPropostas === 'function' && typeof renderizarTabela === 'function') {
+                                    const propostasFiltradas = filtrarPropostas();
+                                    const propostasOrdenadas = ordenarPropostas(propostasFiltradas);
+                                    renderizarTabela(propostasOrdenadas);
+                                }
+                            }
+                        }, 100);
+                    });
+                    
+                    // Configurar controles de tamanho de fonte
+                    const increaseBtn = document.getElementById('increase-font');
+                    const decreaseBtn = document.getElementById('decrease-font');
+                    const fontSizeValue = document.getElementById('font-size-value');
+                    
+                    if (increaseBtn && decreaseBtn && fontSizeValue) {
+                        // Carregar o tamanho da fonte salvo
+                        let currentFontSize = parseInt(localStorage.getItem('tv-font-size') || '16');
+                        fontSizeValue.textContent = currentFontSize;
+                        document.documentElement.style.setProperty('--tv-font-size', `${currentFontSize}px`);
+                        
+                        // Remover event listeners existentes
+                        const newIncreaseBtn = increaseBtn.cloneNode(true);
+                        const newDecreaseBtn = decreaseBtn.cloneNode(true);
+                        increaseBtn.parentNode.replaceChild(newIncreaseBtn, increaseBtn);
+                        decreaseBtn.parentNode.replaceChild(newDecreaseBtn, decreaseBtn);
+                        
+                        newIncreaseBtn.addEventListener('click', function() {
+                            console.log('Botão de aumentar fonte clicado (fallback)');
+                            if (currentFontSize < 32) {
+                                currentFontSize += 2;
+                                fontSizeValue.textContent = currentFontSize;
+                                document.documentElement.style.setProperty('--tv-font-size', `${currentFontSize}px`);
+                                localStorage.setItem('tv-font-size', currentFontSize);
+                            }
+                        });
+                        
+                        newDecreaseBtn.addEventListener('click', function() {
+                            console.log('Botão de diminuir fonte clicado (fallback)');
+                            if (currentFontSize > 12) {
+                                currentFontSize -= 2;
+                                fontSizeValue.textContent = currentFontSize;
+                                document.documentElement.style.setProperty('--tv-font-size', `${currentFontSize}px`);
+                                localStorage.setItem('tv-font-size', currentFontSize);
+                            }
+                        });
+                    }
+                }
+            }, 1000); // Espera 1 segundo para garantir que todos os scripts foram carregados
+        });
+    </script>
+    <!-- Adicionar antes do fechamento do body, após os outros scripts -->
+    <script src="js/tv-mode.js"></script>
+    <!-- Adicionar antes do fechamento do body, após os outros scripts -->
+    <script src="js/debug.js"></script>
+    <!-- Adicionar este script antes de fechar o body -->
+    <script>
+        // Verificar se todas as dependências estão carregadas corretamente
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Verificando dependências...");
+            
+            // Verificar APP_STATE
+            if (typeof window.APP_STATE === 'undefined') {
+                console.error("APP_STATE não está disponível globalmente");
+            } else {
+                console.log("APP_STATE disponível globalmente");
+            }
+            
+            // Verificar CedenteService
+            if (typeof window.CedenteService === 'undefined') {
+                console.error("CedenteService não está disponível globalmente");
+            } else {
+                console.log("CedenteService disponível globalmente");
+            }
+            
+            // Verificar funções globais
+            console.log("filtrarPropostas disponível:", typeof window.filtrarPropostas === 'function');
+            console.log("ordenarPropostas disponível:", typeof window.ordenarPropostas === 'function');
+            console.log("renderizarTabela disponível:", typeof window.renderizarTabela === 'function');
+            console.log("atualizarEstatisticas disponível:", typeof window.atualizarEstatisticas === 'function');
+            
+            // Inicializar o filtro de usuário após garantir que tudo está carregado
+            if (typeof window.atualizarFiltroUsuario === 'function') {
+                setTimeout(window.atualizarFiltroUsuario, 2000);
+            }
+        });
+    </script>
+    <!-- Adicionar antes do fechamento do body, após os outros scripts -->
+    <script src="js/update-monitor.js"></script>
+    <script src="js/pago-color-fix.js"></script>
+    <!-- Adicionar antes do fechamento do body, após os outros scripts -->
+    <script src="js/debug-buttons.js"></script>
+    <script src="js/admin-mode.js"></script>
+    <script src="js/excedido-filter.js"></script>
+    <script src="js/filtro-admin-sync.js"></script>
+    <script src="js/excedido-service.js"></script>
+    <script src="js/excedido-diagnostico.js"></script>
+    <script src="js/excedido-fix.js"></script>
+    
+    <!-- Scripts dos modais -->
+    <script src="js/borderos-detail.js"></script>
+    <script src="js/acumulado-detail.js"></script>
+</body>
+</html>

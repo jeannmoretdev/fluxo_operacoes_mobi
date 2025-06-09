@@ -1,0 +1,298 @@
+/* Estilos para relatórios em PDF */
+
+/* Estilos para o corpo do relatório */
+.print-report {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #fff;
+    color: #333;
+}
+
+/* Cabeçalho do relatório */
+.report-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.report-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.report-subtitle {
+    font-size: 14px;
+    color: #7f8c8d;
+    margin-bottom: 3px;
+}
+
+/* Grupos de status */
+.status-group {
+    margin-bottom: 20px;
+}
+
+.status-header {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Tabela compacta */
+.compact-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+    font-size: 12px;
+}
+
+.compact-table th {
+    background-color: #ecf0f1;
+    color: #2c3e50;
+    font-weight: bold;
+    text-align: left;
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+.compact-table td {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+}
+
+.compact-table tr:nth-child(even) {
+    background-color: #f5f7fa;
+}
+
+/* Cores para status nas tabelas */
+.digitando td {
+    background-color: #d6d6ff;
+}
+
+.aguard-análise td {
+    background-color: #e8daef;
+}
+
+.oper-analisando td {
+    background-color: #f7c7ac;
+}
+
+.q-cert-assinat td {
+    background-color: #d5f5b5;
+}
+
+.pago td {
+    background-color: #c6efd0;
+}
+
+.checagem td {
+    background-color: #b3e5fc;
+}
+
+.postergado td {
+    background-color: #fff9c4;
+}
+
+.cedente-desistiu td, 
+.recusado td {
+    background-color: #ffccbc;
+}
+
+.pendência td {
+    background-color: #ffe0b2;
+}
+
+/* Grid de observações */
+.observations-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+/* Cards de observações */
+.observation-card {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.observation-header {
+    padding: 10px;
+    background-color: #f5f7fa;
+    border-bottom: 1px solid #ddd;
+}
+
+.observation-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.observation-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: #7f8c8d;
+}
+
+.observation-content {
+    padding: 10px;
+}
+
+.observation-item {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.observation-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.observation-user {
+    font-weight: bold;
+    margin-bottom: 3px;
+    color: #3498db;
+}
+
+.observation-text {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Observações automáticas do GER */
+.ger-observation {
+    background-color: rgba(46, 204, 113, 0.1);
+    border-left: 3px solid #2ecc71;
+    padding-left: 8px;
+}
+
+.ger-observation .observation-user {
+    color: #2ecc71;
+}
+
+/* Mensagem de sem dados */
+.no-data {
+    text-align: center;
+    padding: 30px;
+    font-style: italic;
+    color: #7f8c8d;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    margin: 20px 0;
+}
+
+/* Rodapé */
+.footer {
+    text-align: center;
+    font-size: 10px;
+    color: #95a5a6;
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+/* Cores para cards de status */
+.card-digitando {
+    border-left: 4px solid #8e44ad;
+}
+
+.card-aguard-análise {
+    border-left: 4px solid #8e44ad;
+}
+
+.card-oper-analisando {
+    border-left: 4px solid #e67e22;
+}
+
+.card-q-cert-assinat {
+    border-left: 4px solid #56fa09;
+}
+
+.card-pago {
+    border-left: 4px solid #5cad00;
+}
+
+.card-checagem {
+    border-left: 4px solid #55beee;
+}
+
+.card-postergado {
+    border-left: 4px solid #f1c40f;
+}
+
+.card-cedente-desistiu,
+.card-recusado {
+    border-left: 4px solid #c0392b;
+}
+
+.card-pendência {
+    border-left: 4px solid #f39c12;
+}
+
+/* Estilos específicos para impressão do relatório compacto */
+@media print {
+    .report-table {
+        font-size: 10px;
+        width: 100%;
+        page-break-inside: auto;
+    }
+    
+    .report-table th,
+    .report-table td {
+        padding: 4px 6px;
+    }
+    
+    /* Evitar quebras de página dentro de uma linha */
+    .report-table tr {
+        page-break-inside: avoid;
+    }
+    
+    /* Garantir que os comentários do analista não sejam cortados */
+    .report-analyst-comment {
+        page-break-inside: avoid;
+        font-size: 9px;
+        padding: 4px;
+    }
+    
+    /* Ajustar larguras das colunas para impressão */
+    .report-table th:nth-child(1),
+    .report-table td:nth-child(1) {
+        width: 8%; /* Nº */
+    }
+    
+    .report-table th:nth-child(2),
+    .report-table td:nth-child(2) {
+        width: 20%; /* Cedente */
+    }
+    
+    .report-table th:nth-child(3),
+    .report-table td:nth-child(3) {
+        width: 10%; /* Tempo Total */
+    }
+    
+    .report-table th:nth-child(4),
+    .report-table td:nth-child(4) {
+        width: 12%; /* Status */
+    }
+    
+    .report-table th:nth-child(5),
+    .report-table td:nth-child(5) {
+        width: 50%; /* Comentário do Analista */
+    }
+}

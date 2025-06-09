@@ -1,0 +1,169 @@
+/* ==================== VARIÁVEIS E CONFIGURAÇÕES GLOBAIS ==================== */
+:root {
+    /* Cores base */
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --background-color: #f5f7fa;
+    --text-color: #333;
+    --border-color: #ddd;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --info-color: #3498db;
+    --light-color: #ecf0f1;
+    --dark-color: #34495e;
+    --hover-color: #f1f8ff;
+    --hover-border: #80bdff;
+    
+    /* Sistema de cores para status */
+    --status-digitando-bg: #8e44ad;      /* Azul */
+    --status-aguardando-bg: #8e44ad;     /* Roxo */
+    --status-analisando-bg: #F7C7AC;     /* Salmão */
+    --status-pendencia-bg: #1e3799;      /* Azul escuro - era comite-bg */
+    --status-assinatura-bg: #56fa09;     /* Verde claro */
+    --status-pago-bg: #5cad00;           /* Verde */
+    --status-desistiu-bg: #c0392b;       /* Vermelho */
+    --status-recusado-bg: #c0392b;       /* Vermelho */
+    /* --status-pendencia-bg: #f39c12; */  /* Remover esta linha - era laranja */
+    --status-checagem-bg: #55beee;       /* Azul escuro */
+    --status-cotacao-bg: #1e3799;        /* Azul escuro */
+    --status-postergado-bg: #f1c40f;     /* Amarelo */
+    
+    /* Cores de texto para status */
+    --status-digitando-text: white;
+    --status-aguardando-text: white;
+    --status-analisando-text: black;
+    --status-pendencia-text: white;      /* era comite-text */
+    --status-assinatura-text: black;
+    --status-pago-text: white;
+    --status-desistiu-text: white;
+    --status-recusado-text: white;
+    /* --status-pendencia-text: white; */  /* Remover esta linha duplicada */
+    --status-checagem-text: white;
+    --status-cotacao-text: white;
+    --status-postergado-text: black;
+}
+
+/* Reset básico */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ==================== LAYOUT BASE ==================== */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 100%;
+    min-height: 100vh;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* ==================== CABEÇALHO ==================== */
+header {
+    flex-shrink: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+h1 {
+    color: var(--primary-color);
+    font-size: 24px;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* ==================== ANIMAÇÕES ==================== */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-subtle {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+@keyframes highlight {
+    0% { background-color: rgba(52, 152, 219, 0.3); }
+    100% { background-color: transparent; }
+}
+
+@keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==================== TEMA SÓLIDO ==================== */
+/* Classe para aplicar o tema sólido */
+body.tema-solido {
+    --cor-digitando: var(--solido-digitando-borda);
+    --cor-aguardando: var(--solido-aguardando-borda);
+    --cor-analisando: var(--solido-analisando-borda);
+    --cor-assinatura: var(--solido-assinatura-borda);
+    --cor-pago: var(--solido-pago-borda);
+    --cor-desistiu: var(--solido-desistiu-borda);
+    --cor-recusado: var(--solido-recusado-borda);
+    --cor-pendencia: var(--solido-pendencia-borda);
+    --cor-checagem: var(--solido-checagem-borda);
+    --cor-postergado: var(--solido-postergado-borda);
+    
+    --fundo-digitando: var(--solido-digitando-fundo);
+    --fundo-aguardando: var(--solido-aguardando-fundo);
+    --fundo-analisando: var(--solido-analisando-fundo);
+    --fundo-assinatura: var(--solido-assinatura-fundo);
+    --fundo-pago: var(--solido-pago-fundo);
+    --fundo-desistiu: var(--solido-desistiu-fundo);
+    --fundo-recusado: var(--solido-recusado-fundo);
+    --fundo-pendencia: var(--solido-pendencia-fundo);
+    --fundo-checagem: var(--solido-checagem-fundo);
+    --fundo-postergado: var(--solido-postergado-fundo);
+}
+
+/* ==================== UTILITÁRIOS ==================== */
+.text-center {
+    text-align: center;
+}
+
+th.text-center, 
+td.text-center {
+    text-align: center;
+}
+
+/* Classe para novas linhas */
+.new-row {
+    animation: highlight 2s ease-out;
+}
+
+/* Classe para rotação */
+.rotating {
+    animation: rotate 1s linear;
+}

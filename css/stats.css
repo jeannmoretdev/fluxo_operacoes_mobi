@@ -1,0 +1,349 @@
+  /* ==================== SEÇÃO DE OPERAÇÕES COM TEMPO EXCEDIDO ==================== */
+  .excedido-container {
+      margin-top: 30px;
+      margin-bottom: 30px;
+  }
+
+  .section-title {
+      font-size: 20px;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-color);
+  }
+
+  .observations-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+      gap: 20px;
+  }
+
+  .observation-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .observation-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .observation-card-header {
+      padding: 15px;
+      background-color: var(--light-color);
+      border-bottom: 1px solid var(--border-color);
+  }
+
+  .observation-card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+  }
+
+  .observation-number {
+      font-weight: bold;
+      color: var(--primary-color);
+  }
+
+  .observation-cedente {
+      font-weight: bold;
+      font-size: 16px;
+  }
+
+  .observation-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      font-size: 13px;
+      color: var(--dark-color);
+  }
+
+  .observation-card-content {
+      padding: 15px;
+  }
+
+  .observation-item {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+  }
+
+  .observation-item:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+  }
+
+  .observation-user {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: var(--primary-color);
+  }
+
+  .observation-text {
+      font-size: 14px;
+      line-height: 1.5;
+  }
+
+  .no-observations {
+      font-style: italic;
+      color: #777;
+      text-align: center;
+      padding: 20px;
+  }
+
+  .no-excedido {
+      text-align: center;
+      padding: 30px;
+      font-style: italic;
+      color: #777;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      margin: 20px 0;
+  }
+
+  /* Tooltip de histórico de status - versão ultra compacta sem espaçamento */
+  .status-history-tooltip {
+      position: fixed;
+      background-color: white;
+      border-radius: 3px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      padding: 6px;
+      z-index: 1000;
+      width: auto; /* Ajustar automaticamente à largura do conteúdo */
+      max-width: 350px;
+      display: block;
+      text-align: left;
+      color: var(--text-color);
+      font-size: 12px;
+      line-height: 1.3;
+  }
+
+  .status-history-tooltip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #eee;
+  }
+
+  .status-history-tooltip-title {
+      font-weight: bold;
+      font-size: 13px;
+      color: var(--primary-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+  }
+
+  .status-history-tooltip-close {
+      background: none;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--dark-color);
+      padding: 0;
+      margin: 0;
+      line-height: 1;
+      width: 14px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+  }
+
+  .status-history-content {
+      max-height: 250px;
+      overflow-y: auto;
+  }
+
+  .status-history-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0;
+      font-size: 10px;
+      table-layout: auto; /* Permitir que as colunas se ajustem ao conteúdo */
+  }
+
+  .status-history-table th,
+  .status-history-table td {
+      padding: 2px 4px;
+      text-align: left;
+      border-bottom: 1px solid #f5f5f5;
+      white-space: nowrap;
+  }
+
+  .status-history-table th {
+      background-color: #f8f9fa;
+      font-weight: bold;
+      color: #333;
+      font-size: 9px;
+  }
+
+  .status-history-table tr:last-child td {
+      border-bottom: none;
+  }
+
+  .status-history-table .status-atual {
+      font-weight: bold;
+      color: var(--primary-color);
+  }
+
+  .no-history {
+      font-style: italic;
+      color: #777;
+      text-align: center;
+      padding: 5px;
+      font-size: 12px;
+  }
+
+  /* Estilo para scrollbar no tooltip - quase invisível */
+  .status-history-content::-webkit-scrollbar {
+      width: 3px;
+  }
+
+  .status-history-content::-webkit-scrollbar-track {
+      background: transparent;
+  }
+
+  .status-history-content::-webkit-scrollbar-thumb {
+      background: #ddd;
+  }
+
+  /* Estilo para a célula de status clicável - sem ícone */
+  .status-cell {
+      cursor: pointer !important;
+      transition: background-color 0.2s ease;
+      position: relative;
+  }
+
+  .status-cell:hover {
+      background-color: rgba(52, 152, 219, 0.1) !important;
+      text-decoration: underline;
+  }
+
+  /* Responsividade para telas menores */
+  @media (max-width: 768px) {
+      .status-history-tooltip {
+          max-width: 90vw;
+          width: 90vw;
+          left: 5vw !important;
+          right: 5vw !important;
+      }
+  }
+
+  /* Estilo para a lista de histórico */
+  .history-list {
+      width: 100%;
+  }
+
+  .history-item {
+      padding: 3px 0;
+      border-bottom: 1px solid #f5f5f5;
+      display: flex;
+      align-items: center;
+  }
+
+  .history-item:last-child {
+      border-bottom: none;
+  }
+
+  .history-item span {
+      display: inline-block;
+      margin-right: 6px;
+  }
+
+  .history-item span:first-child {
+      flex: 1;
+  }
+
+  .history-item span:nth-child(2),
+  .history-item span:last-child {
+      width: 45px;
+      text-align: right;
+  }
+
+  .history-item .status-atual {
+      font-weight: bold;
+      color: var(--primary-color);
+  }
+
+  /* Estilo para comentários automáticos do sistema */
+  .system-observation {
+      background-color: rgba(52, 152, 219, 0.1);
+      border-left: 3px solid #3498db;
+  }
+
+  .system-observation .observation-user {
+      color: #3498db;
+  }
+
+  /* Estilo para comentários automáticos na seção de operações excedidas */
+  .system-observation-item {
+      background-color: rgba(52, 152, 219, 0.1);
+      border-left: 3px solid #3498db;
+      padding-left: 10px;
+  }
+
+  .system-observation-item .observation-user {
+      color: #3498db;
+  }
+
+  /* Estilo para comentários automáticos do GER */
+  .ger-observation {
+      background-color: rgba(46, 204, 113, 0.1);
+      border-left: 3px solid #2ecc71;
+  }
+
+  .ger-observation .observation-user {
+      color: #2ecc71;
+  }
+
+  /* Estilo para comentários automáticos na seção de operações excedidas */
+  .ger-observation-item {
+      background-color: rgba(46, 204, 113, 0.1);
+      border-left: 3px solid #2ecc71;
+      padding-left: 10px;
+  }
+
+  .ger-observation-item .observation-user {
+      color: #2ecc71;
+  }
+
+  /* Garantir que as células não quebrem o texto, exceto a coluna do cedente */
+  body.tv-mode #propostas-table.tv-mode-table th:not(.cedente-column),
+  body.tv-mode #propostas-table.tv-mode-table td:not(.cedente-column) {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+  }
+
+  /* Adicionar esta regra específica para a coluna do cedente */
+  body.tv-mode #propostas-table.tv-mode-table th.cedente-column,
+  body.tv-mode #propostas-table.tv-mode-table td.cedente-column {
+      white-space: normal !important;
+      word-wrap: break-word !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+  }
+
+  /* ===== CORES PARA PORCENTAGEM DOS BORDERÔS ===== */
+  .porcentagem-baixa {
+      color: #dc3545 !important; /* Vermelho para < 100% */
+      font-weight: 600 !important;
+  }
+
+  .porcentagem-alta {
+      color: #28a745 !important; /* Verde para >= 100% */
+      font-weight: 600 !important;
+  }
+
+  /* Transição suave para mudança de cor */
+  .stat-box h3 {
+      transition: color 0.3s ease;
+  }

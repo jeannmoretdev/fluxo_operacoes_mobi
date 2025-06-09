@@ -1,0 +1,359 @@
+/* ==================== DETALHAMENTO ACUMULADO DO MÊS ==================== */
+
+/* Cursor pointer para indicar que é clicável */
+.stat-card.accumulated {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.stat-card.accumulated:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(142, 68, 173, 0.2);
+}
+
+/* Modal de detalhamento do acumulado */
+.acumulado-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+}
+
+.acumulado-modal.show {
+    display: flex;
+}
+
+.acumulado-modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 900px;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Cabeçalho do modal */
+.acumulado-modal-header {
+    background: linear-gradient(135deg, #8e44ad, #9b59b6);
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.acumulado-modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.acumulado-modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.acumulado-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Corpo do modal */
+.acumulado-modal-body {
+    padding: 0;
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+/* Informações de resumo */
+.acumulado-summary {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+}
+
+.acumulado-summary-item {
+    text-align: center;
+}
+
+.acumulado-summary-label {
+    font-size: 12px;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.acumulado-summary-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #8e44ad;
+}
+
+/* Filtros e ordenação */
+.acumulado-controls {
+    padding: 15px 20px;
+    background: white;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.acumulado-search {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.acumulado-sort {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+}
+
+/* Lista de operações */
+.acumulado-list {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.acumulado-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f1f3f4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s ease;
+}
+
+.acumulado-item:hover {
+    background: #f8f9fa;
+}
+
+.acumulado-item:last-child {
+    border-bottom: none;
+}
+
+.acumulado-item-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.acumulado-item-data {
+    min-width: 80px;
+    font-size: 13px;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.acumulado-item-details {
+    flex: 1;
+}
+
+.acumulado-item-cedente {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 2px;
+}
+
+.acumulado-item-numero {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.acumulado-item-valor {
+    font-size: 16px;
+    font-weight: 600;
+    color: #8e44ad;
+    text-align: right;
+    min-width: 120px;
+}
+
+/* Agrupamento por data */
+.acumulado-date-group {
+    background: #f8f9fa;
+    padding: 10px 20px;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.acumulado-date-total {
+    color: #8e44ad;
+    font-size: 13px;
+}
+
+/* Estado vazio */
+.acumulado-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.acumulado-empty-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+/* Loading */
+.acumulado-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.acumulado-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #8e44ad;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .acumulado-modal-content {
+        width: 95%;
+        margin: 10px;
+    }
+    
+    .acumulado-modal-header {
+        padding: 15px;
+    }
+    
+    .acumulado-modal-title {
+        font-size: 18px;
+    }
+    
+    .acumulado-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .acumulado-search {
+        min-width: auto;
+    }
+    
+    .acumulado-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .acumulado-item-info {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .acumulado-item-data {
+        min-width: auto;
+    }
+    
+    .acumulado-item-valor {
+        text-align: left;
+        font-size: 18px;
+        min-width: auto;
+    }
+    
+    .acumulado-summary {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .acumulado-date-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
+
+/* Animação de carregamento */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Botões de ação do modal */
+.acumulado-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid #e0e0e0;
+    background: #f8f9fa;
+}
+
+.acumulado-pdf-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #8e44ad;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.acumulado-pdf-button:hover {
+    background: #7d3c98;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(142, 68, 173, 0.3);
+}
+
+.acumulado-pdf-button:active {
+    transform: translateY(0);
+}
+
+.acumulado-pdf-button i {
+    font-size: 16px;
+}

@@ -1,0 +1,210 @@
+/* Estilos para a seção de operações excedidas */
+.excedido-container {
+    margin-top: 30px;
+    margin-bottom: 30px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.excedido-container .section-title {
+    font-size: 1.5rem;
+    color: #dc3545;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.observations-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+    gap: 20px;
+}
+
+.observation-item {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.observation-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.observation-header {
+    padding: 15px;
+    background-color: #f1f3f5;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.observation-number {
+    font-weight: 600;
+    color: #495057;
+    margin-right: 10px;
+}
+
+.observation-cedente {
+    color: #6c757d;
+    flex-grow: 1;
+    font-style: italic;
+}
+
+.observation-time {
+    margin-top: 5px;
+    width: 100%;
+    color: #dc3545;
+    font-size: 0.9rem;
+}
+
+.observation-time strong {
+    font-size: 1.1rem;
+}
+
+.observation-details {
+    padding: 15px;
+}
+
+.observation-timestamps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.observation-timestamps span {
+    background-color: #e9ecef;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+.observation-notes {
+    margin-top: 10px;
+}
+
+.observation-notes h4 {
+    font-size: 1rem;
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+.observation-notes ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.observation-notes li {
+    padding: 8px 10px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #dc3545;
+    margin-bottom: 5px;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+}
+
+.no-excedido {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 30px;
+    font-style: italic;
+    color: #6c757d;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Estilos para o modo TV */
+.tv-mode .excedido-container {
+    margin-top: 40px;
+    margin-bottom: 40px;
+}
+
+.tv-mode .section-title {
+    font-size: var(--tv-font-size, 24px);
+}
+
+.tv-mode .observations-list {
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+}
+
+.tv-mode .observation-item {
+    padding: 5px;
+}
+
+.tv-mode .observation-header {
+    padding: 15px 20px;
+}
+
+.tv-mode .observation-number,
+.tv-mode .observation-cedente,
+.tv-mode .observation-time {
+    font-size: calc(var(--tv-font-size, 16px) * 0.9);
+}
+
+.tv-mode .observation-time strong {
+    font-size: calc(var(--tv-font-size, 16px) * 1.1);
+}
+
+.tv-mode .observation-details {
+    padding: 20px;
+}
+
+.tv-mode .observation-timestamps span,
+.tv-mode .observation-notes li {
+    font-size: calc(var(--tv-font-size, 16px) * 0.85);
+}
+
+/* Estilos para impressão */
+@media print {
+    .excedido-container {
+        break-inside: avoid;
+        margin: 20px 0;
+        box-shadow: none;
+        border: 1px solid #dee2e6;
+    }
+    
+    .observations-list {
+        display: block;
+    }
+    
+    .observation-item {
+        margin-bottom: 15px;
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #dee2e6;
+    }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .observations-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .observation-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .observation-cedente {
+        margin-top: 5px;
+    }
+    
+    .observation-timestamps {
+        flex-direction: column;
+    }
+    
+    .observation-timestamps span {
+        margin-bottom: 5px;
+    }
+}

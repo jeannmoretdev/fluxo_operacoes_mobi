@@ -1,0 +1,332 @@
+/* Atualização dos estilos para o relatório de fluxo de operações */
+.flow-chart {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 600px;
+    padding: 10px 0;
+}
+
+.flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px 10px;
+    border-radius: 8px;
+    min-width: 100px;
+    text-align: center;
+    height: 100px;
+}
+
+.flow-icon {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.flow-label {
+    font-weight: bold;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.flow-count {
+    font-size: 16px;
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 3px 8px;
+    border-radius: 10px;
+    min-width: 30px;
+    text-align: center;
+}
+
+.flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    color: var(--dark-color);
+    position: relative;
+    height: 100px;
+    width: 80px;
+}
+
+.flow-arrow i {
+    font-size: 20px;
+    margin-top: 10px;
+}
+
+.flow-time {
+    font-size: 12px;
+    background-color: var(--light-color);
+    padding: 3px 8px;
+    border-radius: 10px;
+    position: absolute;
+    top: 20px;
+    white-space: nowrap;
+}
+
+/* Métricas em grid - simplificado para uma única métrica */
+.metrics-grid {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    background-color: var(--light-color);
+    border-radius: 8px;
+    padding: 20px 30px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+    max-width: 300px;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 16px;
+    color: var(--dark-color);
+}
+
+/* Visualização do fluxo */
+.flow-chart-container {
+    margin: 30px 0;
+    padding: 20px;
+    background-color: var(--light-color);
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+/* Tabela de fluxo */
+.flow-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 15px;
+}
+
+.flow-table th,
+.flow-table td {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.flow-table th {
+    background-color: var(--light-color);
+    font-weight: bold;
+    text-align: left;
+}
+
+.flow-table tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.flow-table tr:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.tempo-acima-media {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.tempo-acima-media::after {
+    content: '*';
+    color: var(--danger-color);
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+.status-cell {
+    font-weight: bold;
+}
+
+.status-concluido {
+    color: var(--success-color);
+}
+
+.status-em-andamento {
+    color: var(--primary-color);
+}
+
+.status-pendente {
+    color: var(--warning-color);
+}
+
+.status-cancelado {
+    color: var(--danger-color);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .flow-chart-container {
+        overflow-x: auto;
+        padding: 10px;
+    }
+    
+    .flow-step {
+        padding: 10px;
+        min-width: 80px;
+        height: 90px;
+    }
+    
+    .flow-arrow {
+        width: 60px;
+    }
+    
+    .flow-time {
+        font-size: 10px;
+        padding: 2px 5px;
+    }
+    
+    .flow-icon {
+        font-size: 20px;
+        margin-bottom: 5px;
+    }
+    
+    .flow-label {
+        margin-bottom: 5px;
+        font-size: 12px;
+    }
+    
+    .flow-count {
+        font-size: 14px;
+    }
+    
+    .metric-card {
+        padding: 15px;
+    }
+    
+    .metric-value {
+        font-size: 24px;
+    }
+    
+    .metric-label {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .metrics-grid {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .metric-card {
+        width: 100%;
+        max-width: none;
+    }
+}
+
+/* Ajustar larguras das colunas na tabela de fluxo */
+.flow-table th:nth-child(1),
+.flow-table td:nth-child(1) {
+    width: 5%; /* Nº */
+}
+
+.flow-table th:nth-child(2),
+.flow-table td:nth-child(2) {
+    width: 8%; /* Data */
+}
+
+.flow-table th:nth-child(3),
+.flow-table td:nth-child(3) {
+    width: 25%; /* Cedente */
+}
+
+.flow-table th:nth-child(4),
+.flow-table td:nth-child(4),
+.flow-table th:nth-child(5),
+.flow-table td:nth-child(5),
+.flow-table th:nth-child(6),
+.flow-table td:nth-child(6) {
+    width: 12%; /* Tempos entre etapas */
+}
+
+.flow-table th:nth-child(7),
+.flow-table td:nth-child(7) {
+    width: 10%; /* Tempo Total */
+}
+
+.flow-table th:nth-child(8),
+.flow-table td:nth-child(8) {
+    width: 10%; /* Status */
+}
+
+/* Ajustar tamanho das etapas no fluxo */
+.flow-step {
+    min-width: 80px; /* Reduzir um pouco a largura mínima */
+    padding: 12px 8px; /* Reduzir o padding */
+}
+
+.flow-label {
+    font-size: 13px; /* Reduzir tamanho da fonte */
+    margin-bottom: 8px;
+}
+
+/* Ajustar espaço entre etapas */
+.flow-arrow {
+    width: 70px; /* Reduzir um pouco a largura */
+}
+
+/* Estilos para as opções de ordenação */
+.report-sorting-options {
+    margin: 15px 0 25px;
+    padding: 10px 15px;
+    background-color: var(--light-color);
+    border-radius: 8px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.sorting-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sorting-control label {
+    font-weight: bold;
+    color: var(--dark-color);
+}
+
+.sorting-control select {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
+    color: var(--dark-color);
+    min-width: 200px;
+}
+
+/* Responsividade para as opções de ordenação */
+@media (max-width: 768px) {
+    .report-sorting-options {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sorting-control {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .sorting-control select {
+        width: 100%;
+    }
+}
