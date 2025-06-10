@@ -178,6 +178,11 @@ async function atualizarEstatisticas(propostasFiltradas) {
     
     console.log(`💰 Borderôs pagos (período filtrado): R$ ${somaValoresAprovados.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${contadorComValor} propostas)`);
 }
+// Encontrar a seção da coluna QCERT (aproximadamente linha 150-170):
+
+// QCERT - usando diretamente a propriedade calculada
+
+
 
 // Função para atualizar a seção de operações excedidas
 function atualizarOperacoesExcedidas() {
@@ -320,20 +325,12 @@ function renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds = []) {
         // Adicionar classe para a célula de status para permitir clique
         const statusCellClass = 'status-cell';
         
-        // LÓGICA CORRIGIDA PARA MODO TV: Determinar qual tempo mostrar na coluna QCERT
+        // LÓGICA CORRIGIDA PARA MODO TV: Usar a nova propriedade calculada
         let tempoParaCertificacao = null;
-        
+
         if (p.horaCertifica) {
-            if (p.horaComite) {
-                // Se passou pelo COMITÊ, mostrar tempo do comitê até certificação
-                tempoParaCertificacao = p.tempoComiteAteCertifica;
-            } else if (p.horaAnalise) {
-                // Se não passou pelo COMITÊ mas passou pela análise, mostrar tempo da análise até certificação
-                tempoParaCertificacao = p.tempoAnaliseAteCertifica;
-            } else {
-                // Se não passou nem pelo comitê nem pela análise, mostrar tempo da entrada até certificação
-                tempoParaCertificacao = p.tempoAteCertifica;
-            }
+            // USAR A NOVA PROPRIEDADE CALCULADA
+            tempoParaCertificacao = p.tempoEtapaAnteriorAteCertifica || p.tempoAteCertifica;
         }
         
         // No modo TV, não incluímos a coluna de data
@@ -345,7 +342,7 @@ function renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds = []) {
             <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise)}</td>
             <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia)}</td>
             <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaCertifica, tempoParaCertificacao)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica)}</td>
             <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento)}</td>
             <td class="text-center ${statusCellClass}" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
         `;
@@ -363,9 +360,10 @@ function renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds = []) {
                 const horaEntrada = dataEntrada.getHours();
                 const entrouAntesDas13 = horaEntrada < 13;
                 const horaAtual = agora.getHours();
-                const passouDas14 = horaAtual >= 14;
+                const minutoAtual = agora.getMinutes();
+                const passouDas13 = horaAtual > 13 || (horaAtual === 13 && minutoAtual > 0);
                 
-                if (entrouAntesDas13 && passouDas14) {
+                if (entrouAntesDas13 && passouDas13) {
                     tempoDecorrido -= 60; // Descontar 1 hora
                 }
                 
@@ -529,7 +527,7 @@ function renderizarTabela(propostasFiltradas, novasPropostasIds = []) {
             <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise)}</td>
             <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia)}</td>
             <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaCertifica, tempoParaCertificacao)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica)}</td>
             <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento)}</td>
             <td class="text-center status-cell" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
         `;
@@ -727,7 +725,7 @@ function alternarModoTV() {
     }, 100);
 }
 
-// Garantir que a função seja chamada quando o DOM estiver carregado
+// Garantant que a função seja chamada quando o DOM estiver carregado
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', configurarModoTV);
 } else {

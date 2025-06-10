@@ -106,6 +106,22 @@ function formatarHoraTempo(hora, tempo) {
     return `${horaFormatada}${tempoFormatado}`;
 }
 
+// Adicionar uma nova função específica para certificação:
+function formatarHoraTempoEtapaAnterior(hora, tempoEtapaAnterior, tempoTotal) {
+    if (!hora) return '<span class="empty-cell">--</span>';
+    
+    const horaFormatada = formatarHora(hora);
+    
+    // Usar tempo da etapa anterior se disponível, senão usar tempo total
+    const tempo = tempoEtapaAnterior !== null ? tempoEtapaAnterior : tempoTotal;
+    const tempoFormatado = tempo ? ` (${formatarTempo(tempo)})` : '';
+    
+    return `${horaFormatada}${tempoFormatado}`;
+}
+
+// Tornar a função global
+window.formatarHoraTempoEtapaAnterior = formatarHoraTempoEtapaAnterior;
+
 // Função para calcular tempo entre duas datas em minutos - com depuração adicional
 function calcularTempoEmMinutos(dataHoraInicio, dataHoraFim) {
     if (!dataHoraInicio || !dataHoraFim) {
@@ -342,3 +358,30 @@ function obterInformacoesMesAtual() {
 
 // Tornar a função global
 window.obterInformacoesMesAtual = obterInformacoesMesAtual;
+
+// Adicionar esta função no final do arquivo js/utils.js
+function formatarDataHora(dataHoraString) {
+    if (!dataHoraString) return '--:--';
+    
+    try {
+        const data = new Date(dataHoraString);
+        if (isNaN(data.getTime())) return '--:--';
+        
+        // Formatar data: DD/MM/YYYY
+        const dia = data.getDate().toString().padStart(2, '0');
+        const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+        const ano = data.getFullYear();
+        
+        // Formatar hora: HH:MM
+        const horas = data.getHours().toString().padStart(2, '0');
+        const minutos = data.getMinutes().toString().padStart(2, '0');
+        
+        return `${dia}/${mes}/${ano} ${horas}:${minutos}`;
+    } catch (error) {
+        console.error("Erro ao formatar data e hora:", error);
+        return '--:--';
+    }
+}
+
+// Tornar a função global
+window.formatarDataHora = formatarDataHora;
