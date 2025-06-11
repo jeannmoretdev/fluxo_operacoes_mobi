@@ -339,11 +339,11 @@ function renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds = []) {
             <td class="text-center">${formatarHora(p.horaEntrada)}</td>
             <td class="text-center">${p.numero}</td>
             <td class="text-center cedente-cell ${cedenteClass}" data-proposta-id="${p.id}">${p.cedente}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia)}</td>
-            <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise, p.tempoAteAnaliseOriginal)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia, p.tempoAnaliseAtePendenciaOriginal)}</td>
+            <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem, null)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica, p.tempoEtapaAnteriorAteCertificaOriginal)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento, p.tempoCertificaAtePagamentoOriginal)}</td>
             <td class="text-center ${statusCellClass}" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
         `;
         
@@ -417,38 +417,6 @@ function renderizarTabela(propostasFiltradas, novasPropostasIds = []) {
         return;
     }
     
-    // Verificar se o cabeçalho da tabela tem a coluna de PENDÊNCIA
-    const tabela = document.getElementById('propostas-table');
-    if (tabela) {
-        const cabecalho = tabela.querySelector('thead tr');
-        if (cabecalho) {
-            // Verificar se já existe a coluna de PENDÊNCIA
-            const colunaPendencia = Array.from(cabecalho.querySelectorAll('th')).find(th => 
-                th.textContent.includes('PENDÊNCIA')
-            );
-            
-            // Se não existir, adicionar a coluna após ANALISTA AUTO
-            if (!colunaPendencia) {
-                const colunaAnalista = Array.from(cabecalho.querySelectorAll('th')).find(th => 
-                    th.textContent.includes('ANALISTA AUTO')
-                );
-                
-                if (colunaAnalista) {
-                    const novaColuna = document.createElement('th');
-                    novaColuna.className = 'sortable text-center';
-                    novaColuna.setAttribute('data-sort', 'pendencia');
-                    novaColuna.innerHTML = 'PENDÊNCIA<span class="sort-icon"></span>';
-                    
-                    colunaAnalista.insertAdjacentElement('afterend', novaColuna);
-                    console.log("Coluna PENDÊNCIA adicionada ao cabeçalho da tabela");
-                    
-                    // Reconfigurar ordenação após adicionar coluna
-                    configurarOrdenacaoPorCabecalho();
-                }
-            }
-        }
-    }
-    
     // Limpar temporizadores existentes
     if (window.tempoRealTimers) {
         window.tempoRealTimers.forEach(timer => clearInterval(timer));
@@ -492,6 +460,28 @@ function renderizarTabela(propostasFiltradas, novasPropostasIds = []) {
         // Criar ID único para tempo total (para atualização em tempo real)
         const tempoTotalId = `tempo-total-${p.id}`;
         
+        // Função auxiliar para formatar tempo com desconto
+        const formatarTempoComDesconto = (tempo, tempoOriginal) => {
+            if (!tempo) return '--';
+            
+            const houveDesconto = tempoOriginal && tempoOriginal > tempo;
+            if (houveDesconto) {
+                return `<span class="tempo-com-desconto" data-tempo-original="${tempoOriginal}" data-tempo-ajustado="${tempo}">${formatarTempo(tempo)}*</span>`;
+            }
+            return formatarTempo(tempo);
+        };
+        
+        // Função auxiliar para formatar hora e tempo com desconto
+        const formatarHoraTempoComDesconto = (hora, tempo, tempoOriginal) => {
+            if (!hora) return '--';
+            
+            const horaFormatada = formatarHora(hora);
+            if (!tempo) return horaFormatada;
+            
+            const tempoFormatado = formatarTempoComDesconto(tempo, tempoOriginal);
+            return `${horaFormatada}<br><small>(${tempoFormatado})</small>`;
+        };
+        
         // LÓGICA CORRIGIDA: Determinar qual tempo mostrar na coluna QCERT
         let tempoParaCertificacao = null;
         let horaOrigemCertificacao = null;
@@ -517,18 +507,18 @@ function renderizarTabela(propostasFiltradas, novasPropostasIds = []) {
             console.log(`Proposta ${p.numero}: QCERT em ${formatarHora(p.horaCertifica)}, tempo desde ${p.horaComite ? 'COMITÊ' : (p.horaAnalise ? 'ANÁLISE' : 'ENTRADA')}: ${tempoParaCertificacao} min`);
         }
         
-        // Adicionar células à linha - COM CLASSES PARA EVENT LISTENERS
+        // Adicionar células à linha - USANDO formatarHoraTempo corrigida
         tr.innerHTML = `
             <td class="text-center tv-hide-column">${p.dataFormatada}</td>
             <td class="text-center" id="${tempoTotalId}">${formatarTempo(p.tempoTotal, true, p.tempoEmTempoReal)}</td>
             <td class="text-center">${formatarHora(p.horaEntrada)}</td>
             <td class="text-center">${p.numero}</td>
             <td class="cedente-cell ${temObservacoes ? 'has-observations' : ''}" data-proposta-id="${p.id}">${p.cedente}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia)}</td>
-            <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise, p.tempoAteAnaliseOriginal)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia, p.tempoAnaliseAtePendenciaOriginal)}</td>
+            <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem, null)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica, p.tempoEtapaAnteriorAteCertificaOriginal)}</td>
+            <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento, p.tempoCertificaAtePagamentoOriginal)}</td>
             <td class="text-center status-cell" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
         `;
         

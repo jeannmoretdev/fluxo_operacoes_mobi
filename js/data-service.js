@@ -324,77 +324,48 @@ async function buscarDados() {
 
 // Modificar a função processarDados para incluir o cálculo do tempo no comitê
 function processarDados(data) {
-    // Log para depuração
-    console.log("Estrutura dos dados recebidos:", data.map(item => {
-        return {
-            DATA: item.DATA,
-            NUMERO: item.NUMERO,
-            CEDENTE: item.CEDENTE,
-            temFluxo: !!item.FLUXO,
-            fluxoLength: item.FLUXO ? item.FLUXO.length : 0,
-            temObservacoes: !!item.OBSERVACOES,
-            observacoesLength: item.OBSERVACOES ? item.OBSERVACOES.length : 0
-        };
-    }));
+    console.log("Processando dados com desconto controlado de horário de almoço...");
     
-    // Mapear os dados para o formato que esperamos
     return data.map(item => {
         try {
-            // Verificar se o item tem os campos necessários
             if (!item || !item.DATA || !item.NUMERO || !item.CEDENTE) {
                 console.error("Item inválido:", item);
                 return null;
             }
             
-            // Garantir que FLUXO seja um array
             const fluxoOriginal = Array.isArray(item.FLUXO) ? item.FLUXO : [];
-            
-            // Garantir que OBSERVACOES seja um array (mesmo que não exista no item)
             const observacoes = Array.isArray(item.OBSERVACOES) ? item.OBSERVACOES : [];
             
-            // Corrigir inconsistências no fluxo: remover retrocessos de "OPER. ANALISANDO" para "AGUARD. ANÁLISE"
-            let fluxo = [...fluxoOriginal]; // Clonar o array original
+            // Corrigir inconsistências no fluxo
+            let fluxo = [...fluxoOriginal];
             
-            // Verificar e corrigir inconsistências no fluxo
             for (let i = 1; i < fluxo.length; i++) {
                 const statusAtual = fluxo[i].STATUS_FLUXO;
                 const statusAnterior = fluxo[i-1].STATUS_FLUXO;
                 
-                // Se o status atual é "AGUARD. ANÁLISE" e o anterior é "OPER. ANALISANDO", remover o atual
                 if (statusAtual === "2 - AGUARD. ANÁLISE" && statusAnterior === "3 - OPER. ANALISANDO") {
-                    console.log(`Inconsistência detectada na proposta ${item.NUMERO}: Retrocesso de "OPER. ANALISANDO" para "AGUARD. ANÁLISE". Removendo entrada inconsistente.`);
-                    
-                    // Remover a entrada inconsistente
+                    console.log(`Inconsistência detectada na proposta ${item.NUMERO}: Retrocesso removido.`);
                     fluxo.splice(i, 1);
-                    
-                    // Ajustar o índice para compensar a remoção
                     i--;
                 }
             }
             
-            // Encontrar a primeira entrada no fluxo (hora de entrada)
+            // Encontrar horários importantes
             const primeiraEntrada = fluxo.length > 0 ? fluxo[0].DATA_HORA_ENTRADA : null;
-            
-            // Determinar o status atual (último status no fluxo)
             const statusAtual = fluxo.length > 0 ? fluxo[fluxo.length - 1].STATUS_FLUXO : "Desconhecido";
             const statusSimplificado = simplificarStatus(statusAtual);
             
-            // Verificar se o status é terminal
+            // Status terminais
             const statusTerminais = ["PAGO", "POSTERGADO", "RECUSADO", "CEDENTE DESISTIU"];
             const isStatusTerminal = statusTerminais.includes(statusSimplificado);
             
-            // Encontrar a entrada de pagamento (status "5 - PAGO" ou "6 - PAGO")
+            // Encontrar entradas específicas
             const entradaPagamento = fluxo.find(f => f.STATUS_FLUXO.includes("PAGO"));
             const horaPagamento = entradaPagamento ? entradaPagamento.DATA_HORA_ENTRADA : null;
             
-            // Encontrar a primeira entrada de análise (status "3 - OPER. ANALISANDO")
             const entradaAnalise = fluxo.find(f => f.STATUS_FLUXO === "3 - OPER. ANALISANDO");
             const horaAnalise = entradaAnalise ? entradaAnalise.DATA_HORA_ENTRADA : null;
             
-            // Calcular o tempo até análise (da entrada até análise)
-            const tempoAteAnalise = calcularTempoEmMinutos(primeiraEntrada, horaAnalise);
-            
-            // Encontrar a entrada de pendência (status "4 - PENDÊNCIA")
             const entradaPendencia = fluxo.find(f => {
                 const status = f.STATUS_FLUXO.toUpperCase();
                 return status.includes('PENDENCIA') || 
@@ -405,20 +376,9 @@ function processarDados(data) {
             });
             const horaPendencia = entradaPendencia ? entradaPendencia.DATA_HORA_ENTRADA : null;
             
-            // Calcular o tempo até pendência (da entrada até pendência)
-            const tempoAtePendencia = calcularTempoEmMinutos(primeiraEntrada, horaPendencia);
-            
-            // Calcular o tempo entre análise e pendência
-            const tempoAnaliseAtePendencia = calcularTempoEmMinutos(horaAnalise, horaPendencia);
-            
-            // Encontrar a entrada de checagem (status "CHECAGEM")
             const entradaChecagem = fluxo.find(f => f.STATUS_FLUXO === "CHECAGEM");
             const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
             
-            // Calcular o tempo até checagem (da entrada até checagem)
-            const tempoAteChecagem = calcularTempoEmMinutos(primeiraEntrada, horaChecagem);
-            
-            // Encontrar a entrada mais recente de certificação
             const entradasCertificacao = fluxo
                 .filter(f => f.STATUS_FLUXO.includes("Q CERT. ASSINAT."))
                 .sort((a, b) => new Date(b.DATA_HORA_ENTRADA) - new Date(a.DATA_HORA_ENTRADA));
@@ -426,107 +386,39 @@ function processarDados(data) {
             const entradaCertifica = entradasCertificacao.length > 0 ? entradasCertificacao[0] : null;
             const horaCertifica = entradaCertifica ? entradaCertifica.DATA_HORA_ENTRADA : null;
             
-            // Calcular o tempo até certificação (da entrada até certificação)
-            const tempoAteCertifica = calcularTempoEmMinutos(primeiraEntrada, horaCertifica);
-            
-            // CRIAR OBJETO TEMPORÁRIO para usar a função do relatório
-            const propostaTempParaCertificacao = {
+            // CRIAR OBJETO TEMPORÁRIO PARA PROCESSAR TEMPOS COM DESCONTO CONTROLADO
+            const propostaTemporal = {
+                numero: item.NUMERO,
                 horaEntrada: primeiraEntrada,
                 horaAnalise: horaAnalise,
                 horaPendencia: horaPendencia,
-                horaCertifica: horaCertifica
+                horaChecagem: horaChecagem,
+                horaCertifica: horaCertifica,
+                horaPagamento: horaPagamento
             };
             
-            // USAR A FUNÇÃO DO RELATÓRIO
-            const tempoEtapaAnteriorAteCertifica = calcularTempoEtapaAnteriorParaCertificacao(propostaTempParaCertificacao);
+            // Atualizar para usar a nova função de desconto único
+            // PROCESSAR TODOS OS TEMPOS COM DESCONTO APENAS NO MAIOR PERÍODO
+            const temposProcessados = processarTemposComDescontoUnicoPeriodo(propostaTemporal);
             
-            // Log para debug
-            if (horaCertifica) {
-                console.log(`Proposta ${item.NUMERO}: Certificação às ${formatarHora(horaCertifica)}`);
-                console.log(`  - Tempo da etapa anterior: ${tempoEtapaAnteriorAteCertifica ? formatarTempo(tempoEtapaAnteriorAteCertifica) : 'N/A'}`);
-                console.log(`  - Passou pela pendência: ${horaPendencia ? 'SIM' : 'NÃO'}`);
-                console.log(`  - Passou pela análise: ${horaAnalise ? 'SIM' : 'NÃO'}`);
-            }
+            // Calcular tempo da etapa anterior até certificação
+            const tempoEtapaAnteriorAteCertifica = calcularTempoEtapaAnteriorParaCertificacao(propostaTemporal);
             
-            // Calcular o tempo entre certificação e pagamento
-            const tempoCertificaAtePagamento = calcularTempoEmMinutos(horaCertifica, horaPagamento);
-            
-            // Calcular o tempo total
+            // Calcular tempo total
             let tempoTotal;
-            
             if (isStatusTerminal) {
-                // Para status terminais, usar a última entrada do fluxo
                 const ultimaEntrada = fluxo[fluxo.length - 1].DATA_HORA_ENTRADA;
                 tempoTotal = calcularTempoEmMinutos(primeiraEntrada, ultimaEntrada);
             } else {
-                // Para status não terminais, calcular até o momento atual
                 const agora = new Date();
                 tempoTotal = calcularTempoEmMinutos(primeiraEntrada, agora);
             }
             
-            // Calcular o tempo até o pagamento (se pago)
-            let tempoAtePagamento = calcularTempoEmMinutos(primeiraEntrada, horaPagamento);
+            const tempoAtePagamento = calcularTempoEmMinutos(primeiraEntrada, horaPagamento);
             
-            // Verificar se a operação entrou antes das 13:00 e passou das 13:00
-            // para descontar 1 hora do tempo total (horário de almoço)
-            if (primeiraEntrada) {
-                const dataEntrada = new Date(primeiraEntrada);
-                const horaEntrada = dataEntrada.getHours();
-                
-                // Verificar se entrou antes das 13:00
-                const entrouAntesDas13 = horaEntrada < 13;
-                
-                if (entrouAntesDas13 && tempoTotal) {
-                    // Se entrou antes das 13:00, verificar se a operação passou das 13:00
-                    let passouDas13 = false;
-                    
-                    if (isStatusTerminal) {
-                        // Para status terminais, verificar a hora da última entrada
-                        const ultimaEntrada = fluxo[fluxo.length - 1].DATA_HORA_ENTRADA;
-                        const dataUltimaEntrada = new Date(ultimaEntrada);
-                        const horaUltimaEntrada = dataUltimaEntrada.getHours();
-                        const minutoUltimaEntrada = dataUltimaEntrada.getMinutes();
-                        
-                        // Verificar se finalizou após 13:00
-                        passouDas13 = horaUltimaEntrada > 13 || (horaUltimaEntrada === 13 && minutoUltimaEntrada > 0);
-                    } else {
-                        // Para operações em andamento, verificar hora atual
-                        const agora = new Date();
-                        const horaAtual = agora.getHours();
-                        const minutoAtual = agora.getMinutes();
-                        passouDas13 = horaAtual > 13 || (horaAtual === 13 && minutoAtual > 0);
-                    }
-                    
-                    if (passouDas13) {
-                        console.log(`Descontando 1 hora do tempo total para proposta ${item.NUMERO} (horário de almoço)`);
-                        tempoTotal -= 60; // Descontar 60 minutos
-                        
-                        // Também descontar do tempo até pagamento, se aplicável
-                        if (tempoAtePagamento) {
-                            tempoAtePagamento -= 60;
-                        }
-                    }
-                }
-            }
-            
-            // Flag para indicar se o tempo total é maior que 2:30 horas (150 minutos)
+            // Flags
             const tempoTotalExcedido = tempoTotal > 150;
-            
-            // Flag para indicar se o tempo está sendo calculado em tempo real
             const tempoEmTempoReal = !isStatusTerminal;
-            
-            // Log para depuração de certificação múltipla
-            if (entradasCertificacao.length > 1) {
-                console.log(`Proposta ${item.NUMERO} tem ${entradasCertificacao.length} entradas de certificação. Usando a mais recente:`, 
-                    entradasCertificacao.map(e => e.DATA_HORA_ENTRADA));
-            }
-
-            
-            
-            // Log para depuração de inconsistências corrigidas
-            if (fluxoOriginal.length !== fluxo.length) {
-                console.log(`Proposta ${item.NUMERO}: Corrigidas ${fluxoOriginal.length - fluxo.length} inconsistências no fluxo.`);
-            }
             
             return {
                 id: `${item.DATA}-${item.NUMERO}`,
@@ -534,32 +426,28 @@ function processarDados(data) {
                 cedente: item.CEDENTE,
                 data: item.DATA,
                 dataFormatada: formatarData(item.DATA),
-                valorProposto: (() => {
-                    const valor = parseFloat(item.VLR_PROPOSTOS) || parseFloat(item.VALOR_PROPOSTO) || 0;
-                    if (valor > 0) console.log(`Proposta ${item.NUMERO}: Valor proposto = ${valor}`);
-                    return valor;
-                })(),
-                valorAprovado: (() => {
-                    const valor = parseFloat(item.VLR_APR_DIR) || parseFloat(item.VLR_APROVADO) || parseFloat(item.VALOR_APROVADO) || 0;
-                    if (valor > 0) console.log(`Proposta ${item.NUMERO}: Valor aprovado = ${valor}`);
-                    return valor;
-                })(),
+                valorProposto: parseFloat(item.VLR_PROPOSTOS) || parseFloat(item.VALOR_PROPOSTO) || 0,
+                valorAprovado: parseFloat(item.VLR_APR_DIR) || parseFloat(item.VLR_APROVADO) || parseFloat(item.VALOR_APROVADO) || 0,
                 horaEntrada: primeiraEntrada,
                 horaAnalise: horaAnalise,
-                tempoAteAnalise: tempoAteAnalise !== null ? Number(tempoAteAnalise) : null,
+                tempoAteAnalise: temposProcessados.tempoAteAnalise.tempoFinal,
+                tempoAteAnaliseOriginal: temposProcessados.tempoAteAnalise.tempoOriginal,
                 horaPendencia: horaPendencia,
-                tempoAtePendencia: tempoAtePendencia !== null ? Number(tempoAtePendencia) : null,
-                tempoAnaliseAtePendencia: tempoAnaliseAtePendencia !== null ? Number(tempoAnaliseAtePendencia) : null,
+                tempoAtePendencia: temposProcessados.tempoAtePendencia.tempoFinal,
+                tempoAtePendenciaOriginal: temposProcessados.tempoAtePendencia.tempoOriginal,
+                tempoAnaliseAtePendencia: temposProcessados.tempoAnaliseAtePendencia.tempoFinal,
+                tempoAnaliseAtePendenciaOriginal: temposProcessados.tempoAnaliseAtePendencia.tempoOriginal,
                 horaChecagem: horaChecagem,
-                tempoAteChecagem: tempoAteChecagem !== null ? Number(tempoAteChecagem) : null,
+                tempoAteChecagem: temposProcessados.tempoAteChecagem.tempoFinal,
+                tempoAteChecagemOriginal: temposProcessados.tempoAteChecagem.tempoOriginal,
                 horaCertifica: horaCertifica,
-                tempoAteCertifica: tempoAteCertifica !== null ? Number(tempoAteCertifica) : null,
-                
-                // APENAS ESTA PROPRIEDADE (que já contém a lógica correta do relatório):
-                tempoEtapaAnteriorAteCertifica: tempoEtapaAnteriorAteCertifica !== null ? Number(tempoEtapaAnteriorAteCertifica) : null,
-                
+                tempoAteCertifica: temposProcessados.tempoAteCertifica.tempoFinal,
+                tempoAteCertificaOriginal: temposProcessados.tempoAteCertifica.tempoOriginal,
+                tempoEtapaAnteriorAteCertifica: tempoEtapaAnteriorAteCertifica,
+                tempoEtapaAnteriorAteCertificaOriginal: temposProcessados.tempoEtapaAnteriorAteCertifica.tempoOriginal,
                 horaPagamento: horaPagamento,
-                tempoCertificaAtePagamento: tempoCertificaAtePagamento !== null ? Number(tempoCertificaAtePagamento) : null,
+                tempoCertificaAtePagamento: temposProcessados.tempoCertificaAtePagamento.tempoFinal,
+                tempoCertificaAtePagamentoOriginal: temposProcessados.tempoCertificaAtePagamento.tempoOriginal,
                 statusAtual: statusAtual,
                 statusSimplificado: statusSimplificado,
                 pesoStatus: getPesoStatus(statusSimplificado),
@@ -575,6 +463,18 @@ function processarDados(data) {
             return null;
         }
     }).filter(item => item !== null); // Remover itens que não puderam ser processados
+}
+
+// Adicionar a função calcularTempoEmMinutosOriginal (sem desconto de almoço)
+function calcularTempoEmMinutosOriginal(dataInicio, dataFim) {
+    if (!dataInicio || !dataFim) {
+        return null;
+    }
+    
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    
+    return Math.round((fim - inicio) / (1000 * 60));
 }
 
 // Modificar a função filtrarPropostas para incluir o filtro por usuário e torná-la global

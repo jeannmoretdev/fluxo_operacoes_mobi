@@ -309,6 +309,117 @@ function calcularTempoEntreEtapas(dataInicio, dataFim) {
     return Math.round(diferencaMs / (1000 * 60)); // Retorna em minutos
 }
 
+// Adicionar função para identificar o maior período com desconto no relatório
+function identificarMaiorPeriodoComDescontoPDF(proposta) {
+    const periodos = [];
+    
+    // Entrada -> Análise
+    if (proposta.horaEntrada && proposta.horaAnalise) {
+        const resultado = calcularDescontoAlmocoPDF(proposta.horaEntrada, proposta.horaAnalise);
+        if (resultado.descontoAplicado) {
+            periodos.push({
+                tipoInicio: 'ENTRADA',
+                tipoFim: 'ANALISE',
+                tempoOriginal: resultado.tempoOriginal,
+                tempoFinal: resultado.tempoFinal,
+                desconto: resultado.tempoOriginal - resultado.tempoFinal
+            });
+        }
+    }
+    
+    // Análise -> Pendência
+    if (proposta.horaAnalise && proposta.horaPendencia) {
+        const resultado = calcularDescontoAlmocoPDF(proposta.horaAnalise, proposta.horaPendencia);
+        if (resultado.descontoAplicado) {
+            periodos.push({
+                tipoInicio: 'ANALISE',
+                tipoFim: 'PENDENCIA',
+                tempoOriginal: resultado.tempoOriginal,
+                tempoFinal: resultado.tempoFinal,
+                desconto: resultado.tempoOriginal - resultado.tempoFinal
+            });
+        }
+    }
+    
+    // Entrada -> Checagem
+    const entradaChecagem = proposta.fluxoCompleto ? proposta.fluxoCompleto.find(f => f.STATUS_FLUXO === "CHECAGEM") : null;
+    const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
+    
+    if (proposta.horaEntrada && horaChecagem) {
+        const resultado = calcularDescontoAlmocoPDF(proposta.horaEntrada, horaChecagem);
+        if (resultado.descontoAplicado) {
+            periodos.push({
+                tipoInicio: 'ENTRADA',
+                tipoFim: 'CHECAGEM',
+                tempoOriginal: resultado.tempoOriginal,
+                tempoFinal: resultado.tempoFinal,
+                desconto: resultado.tempoOriginal - resultado.tempoFinal
+            });
+        }
+    }
+    
+    // Certificação -> Pagamento
+    if (proposta.horaCertifica && proposta.horaPagamento) {
+        const resultado = calcularDescontoAlmocoPDF(proposta.horaCertifica, proposta.horaPagamento);
+        if (resultado.descontoAplicado) {
+            periodos.push({
+                tipoInicio: 'CERTIFICACAO',
+                tipoFim: 'PAGAMENTO',
+                tempoOriginal: resultado.tempoOriginal,
+                tempoFinal: resultado.tempoFinal,
+                desconto: resultado.tempoOriginal - resultado.tempoFinal
+            });
+        }
+    }
+    
+    // Retornar o período com maior tempo original (antes do desconto)
+    if (periodos.length === 0) return null;
+    
+    return periodos.reduce((maior, atual) => 
+        atual.tempoOriginal > maior.tempoOriginal ? atual : maior
+    );
+}
+
+// Função auxiliar para calcular desconto de almoço no PDF
+function calcularDescontoAlmocoPDF(horaInicio, horaFim) {
+    if (!horaInicio || !horaFim) {
+        return { tempoOriginal: 0, tempoFinal: 0, descontoAplicado: false };
+    }
+    
+    const inicio = new Date(horaInicio);
+    const fim = new Date(horaFim);
+    
+    // Calcular tempo original em minutos
+    const tempoOriginalMs = fim - inicio;
+    const tempoOriginal = Math.floor(tempoOriginalMs / (1000 * 60));
+    
+    // Verificar se precisa descontar horário de almoço
+    const horaInicioNum = inicio.getHours();
+    const horaFimNum = fim.getHours();
+    const minutoFim = fim.getMinutes();
+    
+    // Condições para desconto:
+    // 1. Iniciou antes das 13:00
+    // 2. Terminou depois das 13:00 (ou exatamente 13:00 com minutos > 0)
+    const iniciouAntesDas13 = horaInicioNum < 13;
+    const terminouDepoisDas13 = horaFimNum > 13 || (horaFimNum === 13 && minutoFim > 0);
+    
+    if (iniciouAntesDas13 && terminouDepoisDas13) {
+        const tempoFinal = tempoOriginal - 60; // Descontar 1 hora
+        return {
+            tempoOriginal: tempoOriginal,
+            tempoFinal: Math.max(0, tempoFinal), // Não permitir tempo negativo
+            descontoAplicado: true
+        };
+    }
+    
+    return {
+        tempoOriginal: tempoOriginal,
+        tempoFinal: tempoOriginal,
+        descontoAplicado: false
+    };
+}
+
 // Gerar PDF do relatório de fluxo de operações completo com observações
 ReportService.gerarPDFFluxoOperacoes = function() {
     try {
@@ -322,570 +433,386 @@ ReportService.gerarPDFFluxoOperacoes = function() {
         console.log(`Propostas filtradas: ${propostasFiltradas.length}`);
         
         // Ordenar propostas
-        const propostasOrdenadas = [...propostasFiltradas];
+        const propostasOrdenadas = ordenarPropostas(propostasFiltradas);
         
-        // Calcular métricas de fluxo
-        let metricas = {
-            tempoMedioTotal: 0,
-            tempoMedioEntradaAnalise: 0,
-            tempoMedioAnalisePendencia: 0,
-            tempoMedioPendenciaCertificacao: 0,
-            propostasComAnalise: 0,
-            propostasComPendencia: 0,
-            propostasComCertificacao: 0,
-            propostasComPagamento: 0
+        // CALCULAR A MÉDIA DOS TEMPOS TOTAIS DAS PROPOSTAS PAGAS
+        const propostasPagas = propostasOrdenadas.filter(p => p.statusSimplificado === 'PAGO' && p.tempoTotal);
+        const tempoTotalSoma = propostasPagas.reduce((acc, p) => acc + p.tempoTotal, 0);
+        const tempoMedio = propostasPagas.length > 0 ? tempoTotalSoma / propostasPagas.length : 0;
+        const limite50PorcentoMaior = tempoMedio * 1.5; // 50% maior que a média
+        
+        console.log(`Tempo médio das propostas pagas: ${formatarTempo(tempoMedio)}`);
+        console.log(`Limite para sublinhado (50% maior): ${formatarTempo(limite50PorcentoMaior)}`);
+        
+        // Criar novo documento PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        
+        let yPos = 20;
+        const startX = 10;
+        const endX = 287; // Margem direita
+        const totalWidth = endX - startX; // 277mm disponível
+        
+        // Título
+        doc.setFontSize(18); // AUMENTADO de 16 para 18
+        doc.setTextColor(44, 62, 80);
+        doc.text('Relatório de Fluxo de Operações', startX, yPos);
+        yPos += 10; // Aumentado de 8 para 10
+        
+                // PERÍODO E DATA DE GERAÇÃO NA MESMA LINHA
+        const dataInicio = new Date(APP_STATE.dataInicio).toLocaleDateString('pt-BR');
+        const dataFim = new Date(APP_STATE.dataFim).toLocaleDateString('pt-BR');
+        const agora = new Date();
+        const dataHoraGeracao = `${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}`;
+        
+        doc.setFontSize(12);
+        doc.setTextColor(100, 100, 100);
+        const textoPeriodoGeracao = `Período: ${dataInicio} a ${dataFim} | Gerado em: ${dataHoraGeracao}`;
+        doc.text(textoPeriodoGeracao, startX, yPos);
+        yPos += 10;
+
+        
+        // ESTATÍSTICAS CONSOLIDADAS (calculadas uma única vez) - MOVIDO PARA CIMA
+        const totalPropostas = propostasOrdenadas.length;
+        const totalPagas = propostasOrdenadas.filter(p => p.statusSimplificado === 'PAGO').length;
+        const propostasComObservacoes = propostasOrdenadas.filter(p => p.observacoes && p.observacoes.length > 0);
+        const propostasSublinhadas = propostasOrdenadas.filter(p => p.tempoTotal && p.tempoTotal > limite50PorcentoMaior).length;
+        
+        // Calcular tempo médio até pagamento
+        const propostasComPagamento = propostasOrdenadas.filter(p => p.tempoAtePagamento);
+        const tempoTotalPagamento = propostasComPagamento.reduce((acc, p) => acc + p.tempoAtePagamento, 0);
+        const tempoMedioPagamento = propostasComPagamento.length ? Math.round(tempoTotalPagamento / propostasComPagamento.length) : 0;
+        
+        // ESTATÍSTICAS EM UMA LINHA SÓ
+        doc.setFontSize(11);
+        doc.setTextColor(44, 62, 80);
+        const textoEstatisticas = `Total: ${totalPropostas} | Pagas: ${totalPagas} | Tempo Médio: ${formatarTempo(tempoMedioPagamento)} | Sublinhadas: ${propostasSublinhadas} | Com observações: ${propostasComObservacoes.length}`;
+        doc.text(textoEstatisticas, startX, yPos);
+        yPos += 8;
+        
+        // FLUXO VISUAL COM MÉDIAS DOS TEMPOS - MOVIDO PARA CIMA DAS LEGENDAS
+        doc.setFontSize(10);
+        doc.setTextColor(44, 62, 80);
+        doc.text('Fluxo Médio de Tempos:', startX, yPos);
+        yPos += 6;
+        
+        // Calcular médias dos tempos para cada etapa
+        const calcularMediaTempo = (propostas, campo) => {
+            const temposValidos = propostas.filter(p => p[campo] && p[campo] > 0).map(p => p[campo]);
+            return temposValidos.length > 0 ? Math.round(temposValidos.reduce((a, b) => a + b, 0) / temposValidos.length) : 0;
         };
         
-        try {
-            // Calcular tempo médio total
-            let totalTempo = 0;
-            let contadorTempo = 0;
-            
-            // Contadores para etapas
-            let contadorAnalise = 0;
-            let contadorPendencia = 0;
-            let contadorCertificacao = 0;
-            let contadorPagamento = 0;
-            
-            // Contadores para tempos entre etapas
-            let totalTempoEntradaAnalise = 0;
-            let totalTempoAnalisePendencia = 0;
-            let totalTempoPendenciaCertificacao = 0;
-            let totalTempoCertificacaoPagamento = 0;
-            
-            let contadorEntradaAnalise = 0;
-            let contadorAnalisePendencia = 0;
-            let contadorPendenciaCertificacao = 0;
-            let contadorCertificacaoPagamento = 0;
-            
-            for (let i = 0; i < propostasOrdenadas.length; i++) {
-                const p = propostasOrdenadas[i];
-                
-                if (p.tempoTotal) {
-                    totalTempo += p.tempoTotal;
-                    contadorTempo++;
-                }
-                
-                // Contar propostas por etapa
-                if (p.horaAnalise) contadorAnalise++;
-                if (p.horaPendencia) contadorPendencia++;
-                if (p.horaCertifica) contadorCertificacao++;
-                if (p.horaPagamento) contadorPagamento++;
-                
-                // Calcular tempos entre etapas
-                if (p.horaEntrada && p.horaAnalise) {
-                    const tempo = calcularTempoEntreEtapas(p.horaEntrada, p.horaAnalise);
-                    totalTempoEntradaAnalise += tempo;
-                    contadorEntradaAnalise++;
-                }
-                
-                if (p.horaAnalise && p.horaPendencia) {
-                    const tempo = calcularTempoEntreEtapas(p.horaAnalise, p.horaPendencia);
-                    totalTempoAnalisePendencia += tempo;
-                    contadorAnalisePendencia++;
-                }
-                
-                if (p.horaPendencia && p.horaCertifica) {
-                    const tempo = calcularTempoEntreEtapas(p.horaPendencia, p.horaCertifica);
-                    totalTempoPendenciaCertificacao += tempo;
-                    contadorPendenciaCertificacao++;
-                }
-                
-                if (p.horaCertifica && p.horaPagamento) {
-                    const tempo = calcularTempoEntreEtapas(p.horaCertifica, p.horaPagamento);
-                    totalTempoCertificacaoPagamento += tempo;
-                    contadorCertificacaoPagamento++;
-                }
-            }
-            
-            // Calcular médias
-            metricas.tempoMedioTotal = contadorTempo > 0 ? totalTempo / contadorTempo : 0;
-            metricas.tempoMedioEntradaAnalise = contadorEntradaAnalise > 0 ? totalTempoEntradaAnalise / contadorEntradaAnalise : 0;
-            metricas.tempoMedioAnalisePendencia = contadorAnalisePendencia > 0 ? totalTempoAnalisePendencia / contadorAnalisePendencia : 0;
-            metricas.tempoMedioPendenciaCertificacao = contadorPendenciaCertificacao > 0 ? totalTempoPendenciaCertificacao / contadorPendenciaCertificacao : 0;
-            metricas.tempoMedioCertificacaoPagamento = contadorCertificacaoPagamento > 0 ? totalTempoCertificacaoPagamento / contadorCertificacaoPagamento : 0;
-            
-            metricas.propostasComAnalise = contadorAnalise;
-            metricas.propostasComPendencia = contadorPendencia;
-            metricas.propostasComCertificacao = contadorCertificacao;
-            metricas.propostasComPagamento = contadorPagamento;
-            
-            console.log("Métricas calculadas:", metricas);
-        } catch (metricasError) {
-            console.error("Erro ao calcular métricas:", metricasError);
+        const mediaEntradaAnalise = calcularMediaTempo(propostasOrdenadas, 'tempoAteAnalise');
+        const mediaAnalisePendencia = calcularMediaTempo(propostasOrdenadas, 'tempoAnaliseAtePendencia');
+        const mediaEtapaAnteriorCertifica = calcularMediaTempo(propostasOrdenadas, 'tempoEtapaAnteriorAteCertifica');
+        const mediaCertificaPagamento = calcularMediaTempo(propostasOrdenadas, 'tempoCertificaAtePagamento');
+        
+        // Linha do fluxo com tempos após as setas
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        
+        let fluxoTexto = 'ENTRADA';
+        if (mediaEntradaAnalise > 0) {
+            fluxoTexto += ` => ${formatarTempo(mediaEntradaAnalise)} => `;
+        } else {
+            fluxoTexto += ' => ';
         }
         
-        // Período do relatório
-        const dataInicio = formatarData(APP_STATE.dataInicio.toISOString().split('T')[0]);
-        const dataFim = formatarData(APP_STATE.dataFim.toISOString().split('T')[0]);
-        const hoje = new Date();
-        const dataHoje = `${hoje.getDate().toString().padStart(2, '0')}/${(hoje.getMonth() + 1).toString().padStart(2, '0')}/${hoje.getFullYear()}`;
-        
-        // Criar documento PDF
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({
-            orientation: 'landscape',
-            unit: 'mm',
-            format: 'a4'
-        });
-        
-        // Configurações de fonte e cores
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(16);
-        doc.setTextColor(44, 62, 80);
-        
-        // Título do relatório
-        doc.text('Relatório de Fluxo de Operações', 149, 15, { align: 'center' });
-        
-        // Subtítulos
-        doc.setFontSize(10);
-        doc.setTextColor(52, 73, 94);
-        doc.text(`Período: ${dataInicio} a ${dataFim}`, 149, 22, { align: 'center' });
-        doc.text(`Gerado em: ${dataHoje}`, 149, 27, { align: 'center' });
-        doc.text(`Total de operações: ${propostasOrdenadas.length}`, 149, 32, { align: 'center' });
-        doc.text(`Tempo Médio Total: ${formatarTempo(metricas.tempoMedioTotal)}`, 149, 37, { align: 'center' });
-        
-        // Linha separadora
-        doc.setDrawColor(189, 195, 199);
-        doc.line(10, 42, 287, 42);
-        
-        // Posição Y atual
-        let yPos = 50;
-        
-        // PARTE 1: VISUALIZAÇÃO DE FLUXO - ALTERADO PARA PENDÊNCIA
-        console.log("Gerando visualização de fluxo...");
-        
-        // Título da seção
-        doc.setFontSize(14);
-        doc.setTextColor(44, 62, 80);
-        doc.text('Visualização do Fluxo', 10, yPos);
-        
-        yPos += 8;
-        
-        // Desenhar diagrama de fluxo - EM LINHA HORIZONTAL COMPACTA - ALTERADO PARA PENDÊNCIA
-        const etapas = ['Entrada', 'Análise', 'Pendência', 'Certif.', 'Pagto'];
-        const contagens = [
-            propostasOrdenadas.length,
-            metricas.propostasComAnalise,
-            metricas.propostasComPendencia,
-            metricas.propostasComCertificacao,
-            metricas.propostasComPagamento
-        ];
-        const temposEntreEtapas = [
-            formatarTempo(metricas.tempoMedioEntradaAnalise),
-            formatarTempo(metricas.tempoMedioAnalisePendencia),
-            formatarTempo(metricas.tempoMedioPendenciaCertificacao),
-            formatarTempo(metricas.tempoMedioCertificacaoPagamento)
-        ];
-        
-        // Configurações compactas para linha horizontal
-        const etapaWidth = 35;
-        const etapaHeight = 12;
-        const arrowWidth = 25;
-        const startX = 15;
-        
-        // Desenhar todas as etapas em linha
-        for (let i = 0; i < etapas.length; i++) {
-            const x = startX + (i * (etapaWidth + arrowWidth));
-            
-            // Desenhar caixa da etapa (retângulo compacto)
-            doc.setFillColor(41, 128, 185);
-            doc.setDrawColor(41, 128, 185);
-            doc.rect(x, yPos, etapaWidth, etapaHeight, 'FD');
-            
-            // Nome da etapa e contagem na mesma linha
-            doc.setFontSize(8);
-            doc.setTextColor(255, 255, 255);
-            const textoEtapa = `${etapas[i]} (${contagens[i]})`;
-            doc.text(textoEtapa, x + (etapaWidth / 2), yPos + (etapaHeight / 2) + 1, { align: 'center' });
-            
-            // Desenhar seta se não for a última etapa
-            if (i < etapas.length - 1) {
-                const arrowX = x + etapaWidth;
-                const arrowY = yPos + (etapaHeight / 2);
-                
-                // Seta "=>" no centro
-                doc.setFontSize(12);
-                doc.setTextColor(52, 73, 94);
-                doc.text("=>", arrowX + (arrowWidth / 2), arrowY + 1, { align: 'center' });
-                
-                // Tempo entre etapas (abaixo da seta)
-                doc.setFontSize(12);
-                doc.setTextColor(52, 73, 94);
-                doc.text(temposEntreEtapas[i], arrowX + (arrowWidth / 2), arrowY + 6, { align: 'center' });
-            }
+        fluxoTexto += 'ANÁLISE';
+        if (mediaAnalisePendencia > 0) {
+            fluxoTexto += ` => ${formatarTempo(mediaAnalisePendencia)} => `;
+        } else {
+            fluxoTexto += ' => ';
         }
         
-        yPos += etapaHeight + 8;
+        fluxoTexto += 'PENDÊNCIA';
+        if (mediaEtapaAnteriorCertifica > 0) {
+            fluxoTexto += ` => ${formatarTempo(mediaEtapaAnteriorCertifica)} => `;
+        } else {
+            fluxoTexto += ' => ';
+        }
         
-        // PARTE 2: TABELA DE FLUXO DE OPERAÇÕES - ALTERADO PARA PENDÊNCIA
-        console.log("Gerando tabela de fluxo...");
+        fluxoTexto += 'QCERT';
+        if (mediaCertificaPagamento > 0) {
+            fluxoTexto += ` => ${formatarTempo(mediaCertificaPagamento)} => `;
+        } else {
+            fluxoTexto += ' => ';
+        }
         
-        // Título da seção
-        doc.setFontSize(14);
-        doc.setTextColor(44, 62, 80);
-        doc.text('Detalhamento por Operação', 10, yPos);
+        fluxoTexto += 'PAGO';
         
-        yPos += 8;
+        doc.text(fluxoTexto, startX + 5, yPos);
+        yPos += 10;
         
-        // Cabeçalhos da tabela - ALTERADO COMITÊ PARA PENDÊNCIA
-        const headers = ['DATA', 'Tempo Total', 'ENTRADA GER', 'Nº', 'Cedente', 'ANALISTA', 'PENDÊNCIA', 'CHECAGEM', 'QCERT.', 'PAGO', 'Status'];
-        // Ajustar larguras das colunas para 11 colunas
-        const colWidths = [18, 22, 22, 8, 35, 24, 24, 24, 24, 24, 30];
+        // LEGENDAS AGORA FICAM ABAIXO DO FLUXO
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.text('Legendas:', startX, yPos);
+        yPos += 5;
         
-        // Desenhar cabeçalhos
-        doc.setFillColor(236, 240, 241);
-        doc.rect(startX, yPos, 287 - (2 * startX), 8, 'F');
+        doc.setTextColor(100, 100, 100);
+        doc.text('* Maior período com desconto de almoço (máx. 1h) | Número sublinhado: Tempo 50% acima da média', startX + 5, yPos);
+        yPos += 4;
+        doc.text(`Tempo médio (pagas): ${formatarTempo(tempoMedio)} | Limite sublinhado: ${formatarTempo(limite50PorcentoMaior)}`, startX + 5, yPos);
+        yPos += 10;
         
-        doc.setFontSize(8);
-        doc.setTextColor(44, 62, 80);
-
-        let xPos = startX + 3;
+        // CABEÇALHOS DA TABELA COMPACTOS
+        const headers = ['DATA', 'TEMPO\nTOTAL', 'ENTRADA\nGER', 'Nº', 'CEDENTE', 'ANALISTA AUTO', 'PENDÊNCIA', 'CHECAGEM', 'QCERT.', 'PAGO', 'STATUS'];
+        // Colunas mais compactas
+        const colWidths = [18, 20, 18, 12, 38, 25, 25, 25, 25, 25, 22]; // Total: 253mm
+        
+        // Desenhar cabeçalho
+        doc.setFillColor(52, 73, 94);
+        doc.rect(startX, yPos, colWidths.reduce((a, b) => a + b, 0), 10, 'F'); // AUMENTADO de 8 para 10
+        
+        doc.setFontSize(8); // AUMENTADO de 7 para 8
+        doc.setTextColor(255, 255, 255);
+        
+        let xPos = startX + 1;
         headers.forEach((header, i) => {
-            doc.text(header, xPos, yPos + 5);
+            const lines = header.split('\n');
+            if (lines.length > 1) {
+                doc.text(lines[0], xPos + 1, yPos + 4); // Ajustado para nova altura
+                doc.text(lines[1], xPos + 1, yPos + 7); // Ajustado para nova altura
+            } else {
+                doc.text(header, xPos + 1, yPos + 6); // Centralizado na nova altura
+            }
             xPos += colWidths[i];
         });
         
-        yPos += 8;
+        yPos += 10; // AUMENTADO de 8 para 10
         
-        // Adicionar linhas para cada proposta
+        // Processar cada proposta
         for (let i = 0; i < propostasOrdenadas.length; i++) {
             const p = propostasOrdenadas[i];
             
-            // Verificar se precisa de nova página
-            if (yPos > 180) {
+            // Verificar nova página
+            if (yPos > 185) {
                 doc.addPage();
                 yPos = 20;
                 
-                // Redesenhar cabeçalhos na nova página
-                doc.setFillColor(236, 240, 241);
-                doc.rect(startX, yPos, 287 - (2 * startX), 8, 'F');
+                // Redesenhar cabeçalho na nova página
+                doc.setFillColor(52, 73, 94);
+                doc.rect(startX, yPos, colWidths.reduce((a, b) => a + b, 0), 10, 'F'); // AUMENTADO
                 
-                doc.setFontSize(8);
-                doc.setTextColor(44, 62, 80);
+                doc.setFontSize(8); // AUMENTADO
+                doc.setTextColor(255, 255, 255);
                 
-                let xPos = startX + 3;
+                let xPos = startX + 1;
                 headers.forEach((header, i) => {
-                    doc.text(header, xPos, yPos + 5);
+                    const lines = header.split('\n');
+                    if (lines.length > 1) {
+                        doc.text(lines[0], xPos + 1, yPos + 4);
+                        doc.text(lines[1], xPos + 1, yPos + 7);
+                    } else {
+                        doc.text(header, xPos + 1, yPos + 6);
+                    }
                     xPos += colWidths[i];
                 });
                 
-                yPos += 8;
+                yPos += 10; // AUMENTADO
             }
             
-            // Encontrar a entrada de checagem (status "CHECAGEM")
-            const entradaChecagem = p.fluxoCompleto ? p.fluxoCompleto.find(f => f.STATUS_FLUXO === "CHECAGEM") : null;
-            const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
+            // Identificar maior período com desconto
+            const maiorPeriodoComDesconto = identificarMaiorPeriodoComDescontoPDF(p);
             
-            // Calcular tempos entre etapas
-            const tempoEntradaAnalise = calcularTempoEmMinutos(p.horaEntrada, p.horaAnalise);
-            const tempoEntradaChecagem = calcularTempoEmMinutos(p.horaEntrada, horaChecagem);
-            const tempoAnaliseCertificacao = calcularTempoEmMinutos(p.horaAnalise, p.horaCertifica);
-            const tempoCertificacaoPagamento = calcularTempoEmMinutos(p.horaCertifica, p.horaPagamento);
-            
-            // NOVO: Calcular tempo para pendência
-            const tempoAnalisePendencia = calcularTempoEmMinutos(p.horaAnalise, p.horaPendencia);
-            
-            // Alternar cores de fundo para linhas (zebra striping)
+            // Zebra striping
             if (i % 2 === 0) {
-                doc.setFillColor(245, 247, 250);
-            } else {
-                doc.setFillColor(255, 255, 255);
+                doc.setFillColor(248, 249, 250);
+                doc.rect(startX, yPos, colWidths.reduce((a, b) => a + b, 0), 6, 'F'); // AUMENTADO de 5 para 6
             }
-            doc.rect(startX, yPos, 287 - (2 * startX), 7, 'F');
             
-            // Dados da proposta
-            doc.setFontSize(7);
+            doc.setFontSize(7); // AUMENTADO de 6 para 7
             doc.setTextColor(52, 73, 94);
             
-            xPos = startX + 3;
+            xPos = startX + 1;
             
             // DATA
-            doc.text(p.dataFormatada || '', xPos, yPos + 5);
+            doc.text(p.dataFormatada || '', xPos, yPos + 4); // Ajustado para nova altura
             xPos += colWidths[0];
             
-            // Tempo Total
+            // TEMPO TOTAL
             const textoTempoTotal = formatarTempo(p.tempoTotal) || '--';
-            doc.text(textoTempoTotal, xPos, yPos + 5);
+            doc.text(textoTempoTotal, xPos, yPos + 4);
             xPos += colWidths[1];
             
             // ENTRADA GER
             const textoEntrada = formatarHora(p.horaEntrada) || '--';
-            doc.text(textoEntrada, xPos, yPos + 5);
+            doc.text(textoEntrada, xPos, yPos + 4);
             xPos += colWidths[2];
             
-            // Nº
-            doc.text(p.numero.toString(), xPos, yPos + 5);
+            // Nº - ADICIONAR SUBLINHADO SE NECESSÁRIO
+            const numeroTexto = p.numero.toString();
+            const deveSublinhar = p.tempoTotal && p.tempoTotal > limite50PorcentoMaior;
+            
+            if (deveSublinhar) {
+                const numeroWidth = doc.getTextWidth(numeroTexto);
+                doc.text(numeroTexto, xPos, yPos + 4);
+                doc.line(xPos, yPos + 4.5, xPos + numeroWidth, yPos + 4.5);
+            } else {
+                doc.text(numeroTexto, xPos, yPos + 4);
+            }
             xPos += colWidths[3];
             
-            // Cedente (truncar se muito longo)
+            // CEDENTE
             let cedente = p.cedente || '';
-            if (cedente.length > 20) {
-                cedente = cedente.substring(0, 17) + '...';
+            if (cedente.length > 28) {
+                cedente = cedente.substring(0, 25) + '...';
             }
-            doc.text(cedente, xPos, yPos + 5);
+            doc.text(cedente, xPos, yPos + 4);
             xPos += colWidths[4];
             
-            // ANALISTA
+            // ANALISTA AUTO - HORÁRIO E TEMPO NA MESMA LINHA
             let textoAnalista = '--';
             if (p.horaAnalise) {
+                const tempoEntradaAnalise = calcularTempoEmMinutos(p.horaEntrada, p.horaAnalise);
+                let tempoFinal = tempoEntradaAnalise;
+                let asterisco = '';
+                
+                if (maiorPeriodoComDesconto && 
+                    maiorPeriodoComDesconto.tipoInicio === 'ENTRADA' && 
+                    maiorPeriodoComDesconto.tipoFim === 'ANALISE') {
+                    const resultado = calcularDescontoAlmocoPDF(p.horaEntrada, p.horaAnalise);
+                    tempoFinal = resultado.tempoFinal;
+                    asterisco = '*';
+                }
+                
                 const horaAnalise = formatarHora(p.horaAnalise);
-                const tempoAnalise = formatarTempo(tempoEntradaAnalise);
-                textoAnalista = `${horaAnalise}(${tempoAnalise})`;
+                const tempoAnalise = formatarTempo(tempoFinal);
+                textoAnalista = `${horaAnalise} (${tempoAnalise}${asterisco})`;
             }
-            doc.text(textoAnalista, xPos, yPos + 5);
+            doc.text(textoAnalista, xPos, yPos + 4);
             xPos += colWidths[5];
             
-            // PENDÊNCIA - NOVA COLUNA (substituindo COMITÊ)
+            // PENDÊNCIA - HORÁRIO E TEMPO NA MESMA LINHA
             let textoPendencia = '--';
             if (p.horaPendencia) {
+                const tempoAnalisePendencia = calcularTempoEmMinutos(p.horaAnalise, p.horaPendencia);
+                let tempoFinal = tempoAnalisePendencia;
+                let asterisco = '';
+                
+                if (maiorPeriodoComDesconto && 
+                    maiorPeriodoComDesconto.tipoInicio === 'ANALISE' && 
+                    maiorPeriodoComDesconto.tipoFim === 'PENDENCIA') {
+                    const resultado = calcularDescontoAlmocoPDF(p.horaAnalise, p.horaPendencia);
+                    tempoFinal = resultado.tempoFinal;
+                    asterisco = '*';
+                }
+                
                 const horaPendencia = formatarHora(p.horaPendencia);
-                const tempoPendencia = formatarTempo(tempoAnalisePendencia);
-                textoPendencia = `${horaPendencia}(${tempoPendencia})`;
+                const tempoPendencia = formatarTempo(tempoFinal);
+                textoPendencia = `${horaPendencia} (${tempoPendencia}${asterisco})`;
             }
-            doc.text(textoPendencia, xPos, yPos + 5);
+            doc.text(textoPendencia, xPos, yPos + 4);
             xPos += colWidths[6];
             
-            // CHECAGEM
+            // CHECAGEM - HORÁRIO E TEMPO NA MESMA LINHA
+            const entradaChecagem = p.fluxoCompleto ? p.fluxoCompleto.find(f => f.STATUS_FLUXO === "CHECAGEM") : null;
+            const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
+            
             let textoChecagem = '--';
             if (horaChecagem) {
+                const tempoEntradaChecagem = calcularTempoEmMinutos(p.horaEntrada, horaChecagem);
+                let tempoFinal = tempoEntradaChecagem;
+                let asterisco = '';
+                
+                if (maiorPeriodoComDesconto && 
+                    maiorPeriodoComDesconto.tipoInicio === 'ENTRADA' && 
+                    maiorPeriodoComDesconto.tipoFim === 'CHECAGEM') {
+                    const resultado = calcularDescontoAlmocoPDF(p.horaEntrada, horaChecagem);
+                    tempoFinal = resultado.tempoFinal;
+                    asterisco = '*';
+                }
+                
                 const horaChecagemFormatada = formatarHora(horaChecagem);
-                const tempoChecagem = formatarTempo(tempoEntradaChecagem);
-                textoChecagem = `${horaChecagemFormatada}(${tempoChecagem})`;
+                const tempoChecagem = formatarTempo(tempoFinal);
+                textoChecagem = `${horaChecagemFormatada} (${tempoChecagem}${asterisco})`;
             }
-            doc.text(textoChecagem, xPos, yPos + 5);
+            doc.text(textoChecagem, xPos, yPos + 4);
             xPos += colWidths[7];
             
-            // QCERT.
-            let textoCertificacao = '--';
+            // QCERT - HORÁRIO E TEMPO NA MESMA LINHA
+            let textoQCert = '--';
             if (p.horaCertifica) {
-                const horaCertifica = formatarHora(p.horaCertifica);
-                let tempoCertifica;
+                const tempoEtapaAnterior = p.tempoEtapaAnteriorAteCertifica;
+                let tempoFinal = tempoEtapaAnterior;
+                let asterisco = '';
                 
-                // LÓGICA CORRIGIDA: Se passou pela pendência, usar tempo da pendência até certificação
-                // Se NÃO passou pela pendência, usar tempo da análise até certificação
+                // Determinar qual foi a etapa anterior para o desconto
+                let horaInicio = null;
                 if (p.horaPendencia) {
-                    // Passou pela pendência: usar tempo da pendência até certificação
-                    const tempoPendenciaCertificacao = calcularTempoEmMinutos(p.horaPendencia, p.horaCertifica);
-                    tempoCertifica = formatarTempo(tempoPendenciaCertificacao);
+                    horaInicio = p.horaPendencia;
                 } else if (p.horaAnalise) {
-                    // NÃO passou pela pendência: usar tempo da análise até certificação
-                    const tempoAnaliseCertificacao = calcularTempoEmMinutos(p.horaAnalise, p.horaCertifica);
-                    tempoCertifica = formatarTempo(tempoAnaliseCertificacao);
+                    horaInicio = p.horaAnalise;
                 } else {
-                    // Caso não tenha nem análise nem pendência, usar tempo total até certificação
-                    const tempoTotalCertificacao = calcularTempoEmMinutos(p.horaEntrada, p.horaCertifica);
-                    tempoCertifica = formatarTempo(tempoTotalCertificacao);
+                    horaInicio = p.horaEntrada;
                 }
                 
-                textoCertificacao = `${horaCertifica}(${tempoCertifica})`;
+                if (maiorPeriodoComDesconto && horaInicio) {
+                    const resultado = calcularDescontoAlmocoPDF(horaInicio, p.horaCertifica);
+                    if (resultado.tempoOriginal === tempoEtapaAnterior) {
+                        tempoFinal = resultado.tempoFinal;
+                        asterisco = '*';
+                    }
+                }
+                
+                const horaCertifica = formatarHora(p.horaCertifica);
+                const tempoCertifica = formatarTempo(tempoFinal);
+                textoQCert = `${horaCertifica} (${tempoCertifica}${asterisco})`;
             }
-            doc.text(textoCertificacao, xPos, yPos + 5);
+            doc.text(textoQCert, xPos, yPos + 4);
             xPos += colWidths[8];
             
-            // PAGO
-            let textoPagamento = '--';
+            // PAGO - HORÁRIO E TEMPO NA MESMA LINHA
+            let textoPago = '--';
             if (p.horaPagamento) {
+                const tempoCertificaPagamento = p.tempoCertificaAtePagamento;
+                let tempoFinal = tempoCertificaPagamento;
+                let asterisco = '';
+                
+                if (maiorPeriodoComDesconto && 
+                    p.horaCertifica &&
+                    maiorPeriodoComDesconto.tipoInicio === 'CERTIFICACAO' && 
+                    maiorPeriodoComDesconto.tipoFim === 'PAGAMENTO') {
+                    const resultado = calcularDescontoAlmocoPDF(p.horaCertifica, p.horaPagamento);
+                    tempoFinal = resultado.tempoFinal;
+                    asterisco = '*';
+                }
+                
                 const horaPagamento = formatarHora(p.horaPagamento);
-                const tempoPagamento = formatarTempo(tempoCertificacaoPagamento);
-                textoPagamento = `${horaPagamento}(${tempoPagamento})`;
+                const tempoPagamento = formatarTempo(tempoFinal);
+                textoPago = `${horaPagamento} (${tempoPagamento}${asterisco})`;
             }
-            doc.text(textoPagamento, xPos, yPos + 5);
+            doc.text(textoPago, xPos, yPos + 4);
             xPos += colWidths[9];
             
-            // Status
-            doc.text(p.statusSimplificado || '', xPos, yPos + 5);
+            // STATUS
+            const status = p.statusSimplificado || '';
+            doc.text(status, xPos, yPos + 4);
             
-            yPos += 7;
+            yPos += 6; // AUMENTADO de 5 para 6
         }
         
-        // PARTE 3: RELATÓRIO DE OBSERVAÇÕES EM FORMATO DE TABELA
-        console.log("Adicionando página de comentários em formato de tabela...");
-        
-        // Adicionar nova página para os comentários
-        doc.addPage();
-        yPos = 20;
-        
-        // Título da seção de comentários
-        doc.setFontSize(16);
-        doc.setTextColor(44, 62, 80);
-        doc.text('Comentários dos Operadores', 149, yPos, { align: 'center' });
-        
-        yPos += 15;
-        
-        // Filtrar apenas propostas com observações E com status PAGO
-        let propostasComObservacoes = [];
-        try {
-            propostasComObservacoes = propostasOrdenadas.filter(p => 
-                p && 
-                p.observacoes && 
-                Array.isArray(p.observacoes) && 
-                p.observacoes.length > 0 &&
-                p.statusSimplificado === 'PAGO'
-            );
-            console.log(`Propostas PAGAS com observações: ${propostasComObservacoes.length}`);
-        } catch (filterError) {
-            console.error("Erro ao filtrar propostas:", filterError);
-            propostasComObservacoes = [];
-        }
-
-        
-        if (propostasComObservacoes.length === 0) {
-            // Se não houver observações
-            doc.setFontSize(12);
-            doc.setTextColor(127, 140, 141);
-            doc.text('Nenhuma observação encontrada.', 149, yPos, { align: 'center' });
+        // ADICIONAR SEÇÃO DE OBSERVAÇÕES (sempre em nova página)
+        if (typeof window.ObservacoesCardService !== 'undefined' && 
+            typeof window.ObservacoesCardService.renderizarSecaoObservacoes === 'function') {
+            
+            console.log('📋 Adicionando seção de observações...');
+            window.ObservacoesCardService.renderizarSecaoObservacoes(doc, propostasOrdenadas, startX, totalWidth);
         } else {
-            // Cabeçalhos da tabela de observações
-            const obsHeaders = ['Nº', 'Cedente', 'Status', 'Comentários'];
-            const obsColWidths = [8, 50, 30, 177];
-            const obsStartX = 10;
-            const colMargin = 3;
-            
-            // Desenhar cabeçalhos
-            doc.setFillColor(236, 240, 241);
-            doc.rect(obsStartX, yPos, 287 - (2 * obsStartX), 8, 'F');
-            
-            doc.setFontSize(9);
-            doc.setTextColor(44, 62, 80);
-
-            // Posições X para cada coluna, considerando as margens
-            const colX = [
-                obsStartX + colMargin,
-                obsStartX + obsColWidths[0] + colMargin,
-                obsStartX + obsColWidths[0] + obsColWidths[1] + colMargin,
-                obsStartX + obsColWidths[0] + obsColWidths[1] + obsColWidths[2] + colMargin
-            ];
-            
-            // Desenhar os cabeçalhos nas posições corretas
-            obsHeaders.forEach((header, i) => {
-                doc.text(header, colX[i], yPos + 5);
-            });
-
-            yPos += 8;
-            
-            // Para cada proposta com observações
-            for (let i = 0; i < propostasComObservacoes.length; i++) {
-                const proposta = propostasComObservacoes[i];
-                
-                // Filtrar apenas observações de operadores (agora incluindo GER)
-                let observacoesOperadores = [];
-                try {
-                    if (proposta.observacoes && Array.isArray(proposta.observacoes)) {
-                        observacoesOperadores = proposta.observacoes.filter(obs => 
-                            obs && obs.USUARIO && obs.USUARIO !== 'SISTEMA'
-                        );
-                    }
-                } catch (obsError) {
-                    console.error("Erro ao filtrar observações:", obsError);
-                    observacoesOperadores = [];
-                }
-                
-                // Pular se não houver observações de operadores
-                if (observacoesOperadores.length === 0) {
-                    continue;
-                }
-                
-                // Preparar o texto dos comentários
-                let comentariosTexto = '';
-                try {
-                    // Concatenar todos os comentários com o nome do usuário
-                    observacoesOperadores.forEach((obs, index) => {
-                        if (index > 0) {
-                            comentariosTexto += '\n\n';
-                        }
-                        const observacao = obs.OBSERVACAO ? obs.OBSERVACAO.replace(/\\n/g, ' ') : '';
-                        comentariosTexto += `${obs.USUARIO || 'Desconhecido'}: ${observacao}`;
-                    });
-                } catch (concatError) {
-                    console.error("Erro ao concatenar comentários:", concatError);
-                    comentariosTexto = "[Erro ao processar comentários]";
-                }
-
-                
-                // Calcular altura necessária para o texto dos comentários
-                const comentariosLinhas = doc.splitTextToSize(comentariosTexto, obsColWidths[3] - 6);
-                const alturaComentarios = comentariosLinhas.length * 5 + 2;
-                const alturaLinha = Math.max(7, alturaComentarios);
-                
-                // Verificar se precisa de nova página
-                if (yPos + alturaLinha > 190) {
-                    doc.addPage();
-                    yPos = 20;
-                    
-                    // Redesenhar cabeçalhos na nova página
-                    doc.setFillColor(236, 240, 241);
-                    doc.rect(obsStartX, yPos, 287 - (2 * obsStartX), 8, 'F');
-                    
-                    doc.setFontSize(9);
-                    doc.setTextColor(44, 62, 80);
-                    
-                    let obsXPos = obsStartX + 3;
-                    obsHeaders.forEach((header, i) => {
-                        doc.text(header, obsXPos, yPos + 5);
-                        obsXPos += obsColWidths[i];
-                    });
-                    
-                    yPos += 8;
-                }
-                
-                // Alternar cores de fundo para linhas (zebra striping)
-                if (i % 2 === 0) {
-                    doc.setFillColor(245, 247, 250);
-                } else {
-                    doc.setFillColor(255, 255, 255);
-                }
-                doc.rect(obsStartX, yPos, 287 - (2 * obsStartX), alturaLinha, 'F');
-                
-                // Dados da proposta
-                doc.setFontSize(8);
-                doc.setTextColor(52, 73, 94);
-                
-                // Número
-                doc.text(proposta.numero.toString(), obsStartX + 3, yPos + 5);
-                
-                // Cedente (truncar se for muito longo)
-                let cedente = proposta.cedente || '';
-                if (cedente.length > 40) {
-                    cedente = cedente.substring(0, 37) + '...';
-                }
-                doc.text(cedente, obsStartX + obsColWidths[0] + 3, yPos + 5);
-                
-                // Status
-                doc.text(proposta.statusSimplificado || '', obsStartX + obsColWidths[0] + obsColWidths[1] + 3, yPos + 5);
-                
-                // Comentários (com quebra de linha)
-                try {
-                    doc.text(comentariosLinhas, obsStartX + obsColWidths[0] + obsColWidths[1] + obsColWidths[2] + 3, yPos + 5);
-                } catch (textError) {
-                    console.error("Erro ao renderizar texto:", textError);
-                    doc.text("[Erro ao exibir comentários]", obsStartX + obsColWidths[0] + obsColWidths[1] + obsColWidths[2] + 3, yPos + 5);
-                }
-                
-                yPos += alturaLinha;
-            }
-        }
-        
-        // Adicionar numeração de páginas
-        const totalPages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(127, 140, 141);
-            doc.text(`Página ${i} de ${totalPages}`, 149, 200, { align: 'center' });
+            console.warn('⚠️ ObservacoesCardService não disponível - seção de observações não adicionada');
         }
         
         // Salvar o PDF
-        const nomeArquivo = `relatorio_fluxo_${dataInicio.replace(/\//g, '')}_${dataFim.replace(/\//g, '')}.pdf`;
+        const nomeArquivo = `fluxo_operacoes_${new Date().toISOString().slice(0, 10)}.pdf`;
         doc.save(nomeArquivo);
         
         console.log("PDF gerado com sucesso!");
         
     } catch (error) {
         console.error("Erro ao gerar PDF:", error);
-        alert(`Erro ao gerar relatório: ${error.message}`);
+        alert("Erro ao gerar PDF. Verifique o console para mais detalhes.");
     } finally {
-        // Esconder indicador de carregamento
         esconderCarregamento();
     }
 };

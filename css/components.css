@@ -1782,3 +1782,177 @@ body.admin-mode-active .admin-only {
     visibility: visible !important;
     opacity: 1 !important;
 }
+
+/* Corrigir estilo para tempos com desconto de almoço */
+.tempo-com-desconto {
+    cursor: pointer !important;
+    position: relative;
+    font-weight: 500 !important;
+    transition: all 0.2s ease;
+    text-decoration: none !important;
+    display: inline !important; /* Garantir que fique na mesma linha */
+}
+
+.tempo-com-desconto:hover {
+    background-color: rgba(52, 152, 219, 0.1) !important;
+    text-decoration: underline !important;
+    border-radius: 3px;
+    padding: 1px 2px;
+}
+
+/* Garantir que as células da tabela não quebrem linha */
+.propostas-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.propostas-table td small {
+    display: inline !important;
+    white-space: nowrap !important;
+}
+
+/* Tooltip de detalhes do tempo */
+.tempo-details-tooltip {
+    position: fixed;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    padding: 16px;
+    z-index: 1000;
+    min-width: 280px;
+    max-width: 350px;
+    display: block;
+    text-align: left;
+    color: var(--text-color);
+    transition: opacity 0.2s ease;
+    border: 1px solid var(--border-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.tempo-details-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 8px 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent white transparent;
+    filter: drop-shadow(0 -2px 2px rgba(0,0,0,0.1));
+}
+
+.tempo-details-tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.tempo-details-tooltip-title {
+    font-weight: bold;
+    font-size: 15px;
+    color: var(--primary-color);
+}
+
+.tempo-details-tooltip-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--dark-color);
+    padding: 2px;
+    margin: 0;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.tempo-details-tooltip-close:hover {
+    color: white;
+    background-color: var(--danger-color);
+}
+
+.tempo-details-content {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.tempo-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 6px 0;
+}
+
+.tempo-detail-row:last-child {
+    margin-bottom: 0;
+}
+
+.tempo-detail-label {
+    font-weight: 500;
+    color: var(--dark-color);
+    flex: 1;
+}
+
+.tempo-detail-value {
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: right;
+    min-width: 80px;
+}
+
+.tempo-detail-desconto {
+    background-color: rgba(231, 76, 60, 0.08);
+    border-left: 4px solid #e74c3c;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+}
+
+.tempo-detail-desconto .tempo-detail-label {
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.tempo-detail-desconto .tempo-detail-value {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.tempo-detail-info {
+    font-size: 11px;
+    color: #7f8c8d;
+    margin-top: 6px;
+    font-style: italic;
+    text-align: center;
+}
+
+/* Responsividade para telas menores */
+@media (max-width: 768px) {
+    .tempo-details-tooltip {
+        max-width: 90vw;
+        width: 90vw;
+        left: 5vw !important;
+        right: auto !important;
+        min-width: auto;
+    }
+    
+    .tempo-detail-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+    
+    .tempo-detail-value {
+        text-align: left;
+        min-width: auto;
+    }
+}
