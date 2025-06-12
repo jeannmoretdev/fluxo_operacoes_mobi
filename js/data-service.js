@@ -29,12 +29,13 @@ async function buscarDadosPorData(data) {
     }
 }
 
-// Verificar se a função está assim:
+// Função para calcular tempo da etapa anterior até certificação (SEM desconto inicial)
 function calcularTempoEtapaAnteriorParaCertificacao(proposta) {
     if (!proposta.horaCertifica) {
         return null;
     }
     
+    // LÓGICA EXATA DO RELATÓRIO:
     // Se passou pela PENDÊNCIA, usar tempo da pendência até certificação
     if (proposta.horaPendencia) {
         return calcularTempoEmMinutosOriginal(proposta.horaPendencia, proposta.horaCertifica);
@@ -399,16 +400,6 @@ function processarDados(data) {
                 horaPendencia: horaPendencia,
                 horaCertifica: horaCertifica
             });
-
-            if (horaCertifica) {
-                console.log(`🔍 Proposta ${item.NUMERO} - QCERT:`, {
-                    horaCertifica: formatarHora(horaCertifica),
-                    horaPendencia: horaPendencia ? formatarHora(horaPendencia) : 'N/A',
-                    horaAnalise: horaAnalise ? formatarHora(horaAnalise) : 'N/A',
-                    tempoCalculado: tempoEtapaAnteriorAteCertifica,
-                    tempoFormatado: formatarTempo(tempoEtapaAnteriorAteCertifica)
-                });
-            }
 
             const tempoCertificaAtePagamento = calcularTempoEmMinutosOriginal(horaCertifica, horaPagamento);
 
@@ -1108,31 +1099,3 @@ function aplicarDescontoAlmocoNosTempos(proposta) {
     
     return proposta;
 }
-// Se houver uma função de atualização automática, modificar para preservar dados:
-function atualizarDadosAutomaticamente() {
-    // Verificar se está no modo TV
-    const isModoTV = document.body.classList.contains('tv-mode');
-    
-    if (isModoTV) {
-        console.log('Atualização automática no modo TV - preservando formatação');
-        
-        // Buscar novos dados
-        buscarDados().then(() => {
-            // Garantir que o cabeçalho esteja correto após a atualização
-            setTimeout(() => {
-                if (document.body.classList.contains('tv-mode')) {
-                    ajustarCabecalhoTabelaModoTV();
-                    aplicarClassesColunas();
-                }
-            }, 100);
-        });
-    } else {
-        // Atualização normal
-        buscarDados();
-    }
-}
-
-// Iniciar a atualização automática quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', function() {
-    atualizarDadosAutomaticamente();
-});
