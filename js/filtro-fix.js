@@ -74,27 +74,27 @@
             const usuarioSelecionado = this.value;
             console.log(`Usuário selecionado: ${usuarioSelecionado}`);
             
-            // Salvar o usuário selecionado no estado da aplicação
             if (window.APP_STATE) {
                 window.APP_STATE.usuarioSelecionado = usuarioSelecionado;
             }
             
-            // Aplicar o filtro
             if (typeof window.filtrarPropostas === 'function' && 
-                typeof window.ordenarPropostas === 'function' && 
-                typeof window.renderizarTabela === 'function') {
+                typeof window.ordenarPropostas === 'function') {
                 
                 const propostasFiltradas = window.filtrarPropostas();
                 const propostasOrdenadas = window.ordenarPropostas(propostasFiltradas);
                 
-                window.renderizarTabela(propostasOrdenadas);
+                // USAR RENDERIZAÇÃO UNIVERSAL
+                if (typeof window.renderizarTabelaUniversal === 'function') {
+                    window.renderizarTabelaUniversal(propostasOrdenadas);
+                } else {
+                    window.renderizarTabela(propostasOrdenadas);
+                }
                 
-                // Atualizar estatísticas
                 if (typeof window.atualizarEstatisticas === 'function') {
                     window.atualizarEstatisticas(propostasFiltradas);
                 }
                 
-                // Atualizar operações excedidas
                 if (typeof window.atualizarOperacoesExcedidas === 'function') {
                     window.atualizarOperacoesExcedidas(propostasFiltradas);
                 }

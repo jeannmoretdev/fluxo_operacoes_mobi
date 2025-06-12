@@ -188,94 +188,60 @@ function formatarTempoExcedido() {
     });
 }
 
-// Função para alternar o modo TV com funcionalidades aprimoradas
+// Modificar a função alternarModoTVAprimorado:
 function alternarModoTVAprimorado() {
     console.log('Alternando modo TV aprimorado...');
     
     const ativandoModoTV = !document.body.classList.contains('tv-mode');
     document.body.classList.toggle('tv-mode');
     
-    // Atualizar o texto do botão
     const botaoTV = document.getElementById('tv-mode-toggle');
     if (botaoTV) {
         if (document.body.classList.contains('tv-mode')) {
             botaoTV.innerHTML = '<i class="fas fa-desktop"></i> Modo Normal';
             
-            // Iniciar o relógio se não estiver rodando
-            atualizarRelogioTV();
-            if (TV_MODE.clockIntervalId) {
-                clearInterval(TV_MODE.clockIntervalId);
-            }
-            TV_MODE.clockIntervalId = setInterval(atualizarRelogioTV, 1000);
+            // ATIVAR MODO TV INDEPENDENTE
+            setTimeout(() => {
+                buscarDadosModoTV();
+                
+                // Iniciar relógio
+                atualizarRelogioTV();
+                if (TV_MODE.clockIntervalId) {
+                    clearInterval(TV_MODE.clockIntervalId);
+                }
+                TV_MODE.clockIntervalId = setInterval(atualizarRelogioTV, 1000);
+                
+                // INICIAR TIMER DE ATUALIZAÇÃO AUTOMÁTICA
+                iniciarTimerModoTV();
+            }, 100);
+            
         } else {
             botaoTV.innerHTML = '<i class="fas fa-tv"></i> Modo TV';
             
-            // Parar o relógio se estiver rodando
+            // DESATIVAR MODO TV
+            // Parar relógio
             if (TV_MODE.clockIntervalId) {
                 clearInterval(TV_MODE.clockIntervalId);
                 TV_MODE.clockIntervalId = null;
             }
+            
+            // PARAR TIMER DE ATUALIZAÇÃO
+            pararTimerModoTV();
+            
+            // Voltar ao modo normal
+            setTimeout(() => {
+                restaurarCabecalhoTabelaOriginal();
+                // Forçar atualização do modo normal
+                if (typeof atualizarInterface === 'function') {
+                    atualizarInterface();
+                }
+            }, 100);
         }
     }
     
-    // Salvar a preferência
+    // Salvar preferência
     const novoEstado = document.body.classList.contains('tv-mode') ? 'ativo' : 'inativo';
     localStorage.setItem('modo-tv', novoEstado);
-    
-    // Ajustar a visibilidade do cabeçalho do modo TV
-    const tvHeader = document.querySelector('.tv-mode-header');
-    if (tvHeader) {
-        tvHeader.style.display = ativandoModoTV ? 'flex' : 'none';
-    }
-    
-    // Ajustar o tamanho das colunas da tabela
-    const table = document.getElementById('propostas-table');
-    if (table) {
-        if (ativandoModoTV) {
-            // Aplicar classes específicas para o modo TV
-            table.classList.add('tv-mode-table');
-            
-            // Aplicar classes às colunas específicas
-            const headers = table.querySelectorAll('thead th');
-            headers.forEach((header, index) => {
-                const text = header.textContent.trim().toLowerCase();
-                
-                if (text.includes('data')) {
-                    // Adicionar classe à coluna de data
-                    header.classList.add('data-column');
-                    
-                    // Adicionar a mesma classe às células correspondentes
-                    table.querySelectorAll(`tbody tr td:nth-child(${index + 1})`).forEach(cell => {
-                        cell.classList.add('data-column');
-                    });
-                }
-                
-                if (text.includes('cedente')) {
-                    // Adicionar classe à coluna de cedente
-                    header.classList.add('cedente-column');
-                    
-                    // Adicionar a mesma classe às células correspondentes
-                    table.querySelectorAll(`tbody tr td:nth-child(${index + 1})`).forEach(cell => {
-                        cell.classList.add('cedente-column');
-                    });
-                }
-            });
-        } else {
-            // Remover classes específicas do modo TV
-            table.classList.remove('tv-mode-table');
-            
-            // Remover classes específicas das colunas
-            table.querySelectorAll('.data-column, .cedente-column').forEach(cell => {
-                cell.classList.remove('data-column', 'cedente-column');
-            });
-        }
-    }
-    
-    // Não chamar nenhuma função adicional que possa estar causando problemas
-    // Apenas forçar um redimensionamento simples
-    setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-    }, 100);
 }
 
 // Função para inicializar o modo TV
@@ -407,6 +373,12 @@ function configurarModoTVAprimorado() {
             tvHeader.style.display = 'flex';
         }
         
+        // GARANTIR QUE O CABEÇALHO DA TABELA ESTEJA CORRETO
+        setTimeout(() => {
+            ajustarCabecalhoTabelaModoTV();
+            aplicarClassesColunas();
+        }, 500);
+        
         // Iniciar o relógio
         atualizarRelogioTV();
         if (TV_MODE.clockIntervalId) {
@@ -418,71 +390,33 @@ function configurarModoTVAprimorado() {
     console.log('Modo TV aprimorado configurado');
 }
 
-// Inicializar o modo TV quando o DOM estiver carregado
+// Modificar a inicialização do modo TV:
 document.addEventListener('DOMContentLoaded', function() {
-    // Verificar se o cabeçalho do modo TV existe, se não, criá-lo
-    if (!document.querySelector('.tv-mode-header')) {
-        const tvHeader = document.createElement('div');
-        tvHeader.className = 'tv-mode-header';
-        tvHeader.innerHTML = `
-            <div class="tv-date-time">
-                <div class="tv-date" id="tv-date">Data: --/--/----</div>
-                <div class="tv-time" id="tv-time">Hora: --:--:--</div>
-            </div>
-            <div class="tv-font-controls">
-                <span class="tv-font-size-label">Tamanho da fonte:</span>
-                <button class="tv-font-button" id="decrease-font">-</button>
-                <span class="tv-font-size-value" id="font-size-value">16</span>
-                <button class="tv-font-button" id="increase-font">+</button>
-            </div>
-        `;
+    // Aguardar um pouco para garantir que tudo foi carregado
+    setTimeout(() => {
+        configurarModoTVAprimorado();
         
-        // Inserir após o header
-        const header = document.querySelector('header');
-        if (header && header.nextSibling) {
-            header.parentNode.insertBefore(tvHeader, header.nextSibling);
-        } else {
-            // Inserir no início do container se não encontrar o header
-            const container = document.querySelector('.container');
-            if (container && container.firstChild) {
-                container.insertBefore(tvHeader, container.firstChild);
-            } else {
-                // Último recurso: adicionar ao body
-                document.body.insertBefore(tvHeader, document.body.firstChild);
-            }
+        // Se o modo TV estiver ativo, garantir formatação correta
+        if (document.body.classList.contains('tv-mode')) {
+            setTimeout(() => {
+                ajustarCabecalhoTabelaModoTV();
+                aplicarClassesColunas();
+            }, 500);
         }
-        
-        console.log('Cabeçalho do modo TV criado');
-    }
-    
-    // Configurar o modo TV
-    configurarModoTVAprimorado();
+    }, 200);
 });
 
-// Função para interceptar e modificar a renderização da tabela no modo TV
-function interceptarRenderizacaoTabela() {
-    // Salvar a função original de renderização
-    if (!window.renderizarTabelaOriginal) {
-        window.renderizarTabelaOriginal = window.renderizarTabela;
-    }
-    
-    // Substituir a função de renderização
-    window.renderizarTabela = function(propostasFiltradas, novasPropostasIds = []) {
-        console.log('Renderização interceptada - Modo TV:', document.body.classList.contains('tv-mode'));
-        
-        // Se estiver no modo TV, usar renderização específica
-        if (document.body.classList.contains('tv-mode')) {
-            renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds);
-        } else {
-            // Usar renderização original
-            window.renderizarTabelaOriginal(propostasFiltradas, novasPropostasIds);
-        }
-    };
-}
 
 // Função específica para renderizar tabela no modo TV (sem coluna de data)
 function renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds = []) {
     console.log('Renderizando tabela no modo TV');
+    
+    // Verificar se as propostas já foram processadas corretamente
+    propostasFiltradas.forEach(p => {
+        if (!p.tempoEtapaAnteriorAteCertifica && p.horaCertifica) {
+            console.warn(`Proposta ${p.numero} sem tempoEtapaAnteriorAteCertifica calculado`);
+        }
+    });
     
     const tbody = document.getElementById('propostas-body');
     if (!tbody) {
@@ -668,9 +602,6 @@ function ajustarCabecalhoTabelaModoTV() {
 function configurarModoTV() {
     console.log('Configurando modo TV...');
     
-    // Interceptar a renderização da tabela
-    interceptarRenderizacaoTabela();
-    
     // Verificar se o modo TV estava ativo
     const modoTVSalvo = localStorage.getItem('modo-tv');
     if (modoTVSalvo === 'ativo') {
@@ -786,3 +717,337 @@ document.addEventListener('DOMContentLoaded', function() {
         adicionarBotaoVerificarModoTV();
     }, 1000);
 });
+
+// Função específica para buscar dados no modo TV
+async function buscarDadosModoTV() {
+    console.log('🖥️ Buscando dados específicos para modo TV...');
+    
+    if (!window.APP_STATE) {
+        console.error('APP_STATE não disponível');
+        return;
+    }
+    
+    try {
+        // Usar os dados já carregados
+        const propostas = window.APP_STATE.propostas || [];
+        console.log(`📊 [TV] Processando ${propostas.length} propostas`);
+        
+        // Filtrar e ordenar (usando as funções normais que já funcionam)
+        const propostasFiltradas = window.filtrarPropostas ? window.filtrarPropostas() : propostas;
+        const propostasOrdenadas = ordenarPropostasModoTV(propostasFiltradas);
+        
+        // Renderizar especificamente para modo TV
+        renderizarTabelaModoTVEspecifica(propostasOrdenadas);
+        
+        console.log(`✅ [TV] Modo TV atualizado com ${propostasOrdenadas.length} propostas`);
+        
+    } catch (error) {
+        console.error('❌ [TV] Erro ao buscar dados para modo TV:', error);
+    }
+}
+
+// Função para filtrar propostas no modo TV
+function filtrarPropostasModoTV(propostas) {
+    if (!Array.isArray(propostas)) return [];
+    
+    // Usar os mesmos filtros do modo normal
+    const statusFiltro = document.getElementById('status-filter')?.value || 'todos';
+    const cedenteFiltro = document.getElementById('cedente-filter')?.value?.toLowerCase() || '';
+    const usuarioFiltro = document.getElementById('usuario-filter')?.value || 'todos';
+    
+    return propostas.filter(proposta => {
+        // Filtro de status
+        const passaFiltroStatus = statusFiltro === 'todos' || 
+            proposta.statusAtual === statusFiltro || 
+            proposta.statusSimplificado === statusFiltro;
+        
+        // Filtro de cedente
+        const passaFiltroCedente = cedenteFiltro === '' || 
+            proposta.cedente.toLowerCase().includes(cedenteFiltro);
+        
+        // Filtro de usuário
+        let passaFiltroUsuario = true;
+        if (usuarioFiltro !== 'todos' && window.CedenteService && 
+            typeof window.CedenteService.cedenteAssociadoAoUsuario === 'function') {
+            passaFiltroUsuario = window.CedenteService.cedenteAssociadoAoUsuario(proposta.cedente, usuarioFiltro);
+        }
+        
+        return passaFiltroStatus && passaFiltroCedente && passaFiltroUsuario;
+    });
+}
+
+// Modificar a função ordenarPropostasModoTV para SEMPRE usar ordenação por status:
+function ordenarPropostasModoTV(propostas) {
+    if (!Array.isArray(propostas)) return [];
+    
+    console.log('🖥️ [TV] Forçando ordenação por status (início para fim)');
+    
+    // SEMPRE usar ordenação por status no modo TV
+    const propostasOrdenadas = [...propostas];
+    
+    // Ordenar por peso do status (início para fim do fluxo)
+    propostasOrdenadas.sort((a, b) => {
+        // Usar o peso do status para ordenar do início ao fim do processo
+        const pesoA = a.pesoStatus || getPesoStatus(a.statusSimplificado) || 0;
+        const pesoB = b.pesoStatus || getPesoStatus(b.statusSimplificado) || 0;
+        
+        // Ordenação crescente (início para fim)
+        return pesoA - pesoB;
+    });
+    
+    console.log(`✅ [TV] Propostas ordenadas por status: ${propostasOrdenadas.length} itens`);
+    
+    return propostasOrdenadas;
+}
+
+// Função de renderização completamente independente para modo TV
+function renderizarTabelaModoTVEspecifica(propostas) {
+    console.log('🖥️ Renderizando tabela específica do modo TV');
+    
+    const tbody = document.getElementById('propostas-body');
+    if (!tbody) {
+        console.error('Elemento tbody não encontrado');
+        return;
+    }
+    
+    // Garantir cabeçalho correto
+    ajustarCabecalhoTabelaModoTV();
+    
+    // Limpar tabela
+    tbody.innerHTML = '';
+    
+    if (!Array.isArray(propostas) || propostas.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="10" class="no-data">Nenhuma proposta encontrada</td>`;
+        tbody.appendChild(tr);
+        return;
+    }
+    
+    // Limpar temporizadores existentes
+    if (window.tempoRealTimers) {
+        window.tempoRealTimers.forEach(timer => clearInterval(timer));
+    }
+    window.tempoRealTimers = [];
+    
+    propostas.forEach(p => {
+        const tr = document.createElement('tr');
+        
+        // Aplicar classe de status
+        const statusClass = getStatusClass ? getStatusClass(p.statusAtual) : '';
+        if (statusClass) {
+            tr.className = statusClass;
+        }
+        
+        tr.id = `proposta-${p.id}`;
+        
+        // Calcular dados necessários
+        const entradaChecagem = p.fluxoCompleto ? 
+            p.fluxoCompleto.find(f => f.STATUS_FLUXO === "CHECAGEM") : null;
+        const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
+        const tempoAteChecagem = horaChecagem ? 
+            calcularTempoEmMinutos(p.horaEntrada, horaChecagem) : null;
+        
+        // GARANTIR que tempoEtapaAnteriorAteCertifica existe
+        if (p.horaCertifica && !p.tempoEtapaAnteriorAteCertifica) {
+            if (p.horaPendencia) {
+                p.tempoEtapaAnteriorAteCertifica = calcularTempoEmMinutos(p.horaPendencia, p.horaCertifica);
+            } else if (p.horaAnalise) {
+                p.tempoEtapaAnteriorAteCertifica = calcularTempoEmMinutos(p.horaAnalise, p.horaCertifica);
+            } else {
+                p.tempoEtapaAnteriorAteCertifica = calcularTempoEmMinutos(p.horaEntrada, p.horaCertifica);
+            }
+        }
+        
+        // Verificar observações
+        const temObservacoes = p.observacoes && p.observacoes.length > 0;
+        const cedenteClass = temObservacoes ? 'has-observations' : '';
+        
+        // ID único para tempo total
+        const tempoTotalId = `tempo-total-${p.id}`;
+        
+        // Renderizar linha (SEM COLUNA DE DATA)
+        tr.innerHTML = `
+            <td class="text-center" id="${tempoTotalId}">${formatarTempo(p.tempoTotal, true, p.tempoEmTempoReal)}</td>
+            <td class="text-center">${formatarHora(p.horaEntrada)}</td>
+            <td class="text-center">${p.numero}</td>
+            <td class="text-center cedente-cell ${cedenteClass}" data-proposta-id="${p.id}">${p.cedente}</td>
+            <td class="text-center">${formatarHoraTempoTV(p.horaAnalise, p.tempoAteAnalise)}</td>
+            <td class="text-center">${formatarHoraTempoTV(p.horaPendencia, p.tempoAnaliseAtePendencia)}</td>
+            <td class="text-center">${formatarHoraTempoTV(horaChecagem, tempoAteChecagem)}</td>
+            <td class="text-center">${formatarHoraTempoTV(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica)}</td>
+            <td class="text-center">${formatarHoraTempoTV(p.horaPagamento, p.tempoCertificaAtePagamento)}</td>
+            <td class="text-center status-cell" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
+        `;
+        
+        tbody.appendChild(tr);
+        
+        // Configurar timer para tempo real
+        if (p.tempoEmTempoReal && p.horaEntrada) {
+            const dataEntrada = new Date(p.horaEntrada);
+            const timer = setInterval(() => {
+                const agora = new Date();
+                let tempoDecorrido = Math.floor((agora - dataEntrada) / (1000 * 60));
+                
+                // Aplicar desconto de almoço se necessário
+                const horaEntrada = dataEntrada.getHours();
+                const entrouAntesDas13 = horaEntrada < 13;
+                const horaAtual = agora.getHours();
+                const passouDas14 = horaAtual >= 14;
+                
+                if (entrouAntesDas13 && passouDas14) {
+                    tempoDecorrido -= 60;
+                }
+                
+                const tempoTotalCell = document.getElementById(tempoTotalId);
+                if (tempoTotalCell) {
+                    tempoTotalCell.innerHTML = formatarTempo(tempoDecorrido, true, true);
+                }
+            }, 60000);
+            
+            window.tempoRealTimers.push(timer);
+        }
+    });
+    
+    // Configurar event listeners
+    configurarEventListenersModoTV();
+    
+    console.log(`✅ Tabela modo TV renderizada com ${propostas.length} propostas`);
+}
+
+// Função específica para formatar hora e tempo no modo TV
+function formatarHoraTempoTV(hora, tempo) {
+    if (!hora) return '--';
+    
+    const horaFormatada = formatarHora(hora);
+    if (!tempo) return horaFormatada;
+    
+    return `${horaFormatada} (${formatarTempo(tempo)})`;
+}
+
+// Event listeners específicos para modo TV
+function configurarEventListenersModoTV() {
+    // Observações
+    document.querySelectorAll('.cedente-cell.has-observations').forEach(cell => {
+        cell.style.cursor = 'pointer';
+        cell.title = 'Clique para ver as observações';
+        
+        cell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const propostaId = cell.dataset.propostaId;
+            const proposta = window.APP_STATE.propostas.find(p => p.id === propostaId);
+            if (proposta && typeof mostrarObservacoes === 'function') {
+                mostrarObservacoes(proposta);
+            }
+        });
+    });
+    
+    // Status
+    document.querySelectorAll('.status-cell').forEach(cell => {
+        cell.style.cursor = 'pointer';
+        cell.title = 'Clique para ver o histórico de status';
+        
+        cell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const propostaId = cell.dataset.propostaId;
+            const proposta = window.APP_STATE.propostas.find(p => p.id === propostaId);
+            if (proposta && typeof mostrarHistoricoStatus === 'function') {
+                mostrarHistoricoStatus(proposta);
+            }
+        });
+    });
+}
+
+// Timer específico para modo TV
+let timerAtualizacaoModoTV = null;
+
+// Iniciar timer de atualização para modo TV
+function iniciarTimerModoTV() {
+    // Parar timer existente se houver
+    if (timerAtualizacaoModoTV) {
+        clearInterval(timerAtualizacaoModoTV);
+    }
+    
+    // Atualizar a cada 30 segundos no modo TV
+    timerAtualizacaoModoTV = setInterval(() => {
+        if (document.body.classList.contains('tv-mode')) {
+            console.log('🔄 Atualização automática do modo TV');
+            buscarDadosModoTV();
+        } else {
+            // Se não estiver mais no modo TV, parar o timer
+            pararTimerModoTV();
+        }
+    }, 30000); // 30 segundos
+    
+    console.log('⏰ Timer de atualização do modo TV iniciado');
+}
+
+// Parar timer do modo TV
+function pararTimerModoTV() {
+    if (timerAtualizacaoModoTV) {
+        clearInterval(timerAtualizacaoModoTV);
+        timerAtualizacaoModoTV = null;
+        console.log('⏰ Timer de atualização do modo TV parado');
+    }
+}
+
+// Escutar mudanças nos filtros quando estiver no modo TV
+function configurarFiltrosModoTV() {
+    const statusFilter = document.getElementById('status-filter');
+    const cedenteFilter = document.getElementById('cedente-filter');
+    const usuarioFilter = document.getElementById('usuario-filter');
+    
+    [statusFilter, cedenteFilter, usuarioFilter].forEach(filter => {
+        if (filter) {
+            filter.addEventListener('change', () => {
+                if (document.body.classList.contains('tv-mode')) {
+                    console.log('🔄 Filtro alterado no modo TV - atualizando');
+                    setTimeout(() => {
+                        buscarDadosModoTV();
+                    }, 100);
+                }
+            });
+        }
+    });
+}
+
+// Chamar na inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        configurarFiltrosModoTV();
+    }, 500);
+});
+
+// Modificar a inicialização:
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        configurarModoTVAprimorado();
+        
+        // Se o modo TV estiver ativo ao carregar a página
+        if (document.body.classList.contains('tv-mode')) {
+            console.log('🖥️ Página carregada no modo TV - inicializando lógica independente');
+            
+            setTimeout(() => {
+                buscarDadosModoTV();
+                
+                // Iniciar relógio
+                atualizarRelogioTV();
+                if (TV_MODE.clockIntervalId) {
+                    clearInterval(TV_MODE.clockIntervalId);
+                }
+                TV_MODE.clockIntervalId = setInterval(atualizarRelogioTV, 1000);
+                
+                // Iniciar timer de atualização
+                iniciarTimerModoTV();
+            }, 1000);
+        }
+    }, 200);
+});
+
+// Limpar timers ao sair da página
+window.addEventListener('beforeunload', function() {
+    pararTimerModoTV();
+    if (TV_MODE.clockIntervalId) {
+        clearInterval(TV_MODE.clockIntervalId);
+    }
+});
+

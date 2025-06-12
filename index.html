@@ -313,7 +313,12 @@
     <!-- Adicionar o serviço de cedentes antes do data-service -->
     <script src="js/cedente-service.js"></script>
     <script src="js/data-service.js"></script>
-    <script src="js/ui-components.js"></script>
+    <!-- UI Components - Dividido em módulos -->
+    <script src="js/ui-components-core.js"></script>
+    <script src="js/ui-components-stats.js"></script>
+    <script src="js/ui-components-render.js"></script>
+    <script src="js/ui-components-events.js"></script>
+    <script src="js/ui-components-modals.js"></script>
     <script src="js/event-handlers.js"></script>
     <script src="js/main.js"></script>
     <script src="js/user-filter.js"></script>
@@ -486,5 +491,15 @@
     <script src="js/tempo-tooltip.js"></script>
     <!-- Adicionar antes do fechamento do body, após os outros scripts -->
     <script src="js/observacoes-card.js"></script>
+    <script src="js/app.js"></script>
+    <!-- Filtros e Estado -->
+    <script src="js/filtros-estado.js"></script>
+
+    <!-- UI Components - Dividido em módulos (ORDEM IMPORTANTE) -->
+    <script src="js/ui-components-core.js"></script>
+    <script src="js/ui-components-stats.js"></script>
+    <script src="js/ui-components-render.js"></script>
+    <script src="js/ui-components-events.js"></script>
+    <!-- Remover ui-components-modals.js já que movemos para core -->
 </body>
 </html>

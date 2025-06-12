@@ -29,32 +29,31 @@ async function buscarDadosPorData(data) {
     }
 }
 
-// ADICIONAR esta função no início do arquivo data-service.js (antes da função processarDados)
+// Verificar se a função está assim:
 function calcularTempoEtapaAnteriorParaCertificacao(proposta) {
     if (!proposta.horaCertifica) {
         return null;
     }
     
-    // LÓGICA EXATA DO RELATÓRIO:
     // Se passou pela PENDÊNCIA, usar tempo da pendência até certificação
     if (proposta.horaPendencia) {
-        return calcularTempoEmMinutos(proposta.horaPendencia, proposta.horaCertifica);
+        return calcularTempoEmMinutosOriginal(proposta.horaPendencia, proposta.horaCertifica);
     }
     
     // Se NÃO passou pela pendência mas passou pela análise, usar tempo da análise até certificação
     if (proposta.horaAnalise) {
-        return calcularTempoEmMinutos(proposta.horaAnalise, proposta.horaCertifica);
+        return calcularTempoEmMinutosOriginal(proposta.horaAnalise, proposta.horaCertifica);
     }
     
     // Se não passou nem pela pendência nem pela análise, usar tempo da entrada até certificação
-    return calcularTempoEmMinutos(proposta.horaEntrada, proposta.horaCertifica);
+    return calcularTempoEmMinutosOriginal(proposta.horaEntrada, proposta.horaCertifica);
 }
 
 // Adicionar função para gerar comentários automáticos separados para propostas PAGAS com tempo excedido
 function adicionarComentariosAutomaticos(propostas) {
     // Filtrar propostas PAGAS que excedem 2:30 horas e não têm comentários automáticos
     const propostasExcedidas = propostas.filter(p => {
-        // Verificar se a proposta está PAGA
+        // Verificar se a proposta está PAGO
         const estaPaga = p.statusSimplificado === "PAGO";
         
         // Verificar se a proposta excede 2:30 horas (150 minutos)
@@ -386,41 +385,65 @@ function processarDados(data) {
             const entradaCertifica = entradasCertificacao.length > 0 ? entradasCertificacao[0] : null;
             const horaCertifica = entradaCertifica ? entradaCertifica.DATA_HORA_ENTRADA : null;
             
-            // CRIAR OBJETO TEMPORÁRIO PARA PROCESSAR TEMPOS COM DESCONTO CONTROLADO
-            const propostaTemporal = {
-                numero: item.NUMERO,
+            // Calcular tempos SEM desconto inicial
+            const tempoAteAnalise = calcularTempoEmMinutosOriginal(primeiraEntrada, horaAnalise);
+            const tempoAtePendencia = calcularTempoEmMinutosOriginal(primeiraEntrada, horaPendencia);
+            const tempoAnaliseAtePendencia = calcularTempoEmMinutosOriginal(horaAnalise, horaPendencia);
+            const tempoAteChecagem = calcularTempoEmMinutosOriginal(primeiraEntrada, horaChecagem);
+            const tempoAteCertifica = calcularTempoEmMinutosOriginal(primeiraEntrada, horaCertifica);
+
+            // Calcular tempo da etapa anterior até certificação
+            const tempoEtapaAnteriorAteCertifica = calcularTempoEtapaAnteriorParaCertificacao({
                 horaEntrada: primeiraEntrada,
                 horaAnalise: horaAnalise,
                 horaPendencia: horaPendencia,
-                horaChecagem: horaChecagem,
-                horaCertifica: horaCertifica,
-                horaPagamento: horaPagamento
-            };
-            
-            // Atualizar para usar a nova função de desconto único
-            // PROCESSAR TODOS OS TEMPOS COM DESCONTO APENAS NO MAIOR PERÍODO
-            const temposProcessados = processarTemposComDescontoUnicoPeriodo(propostaTemporal);
-            
-            // Calcular tempo da etapa anterior até certificação
-            const tempoEtapaAnteriorAteCertifica = calcularTempoEtapaAnteriorParaCertificacao(propostaTemporal);
-            
-            // Calcular tempo total
+                horaCertifica: horaCertifica
+            });
+
+            if (horaCertifica) {
+                console.log(`🔍 Proposta ${item.NUMERO} - QCERT:`, {
+                    horaCertifica: formatarHora(horaCertifica),
+                    horaPendencia: horaPendencia ? formatarHora(horaPendencia) : 'N/A',
+                    horaAnalise: horaAnalise ? formatarHora(horaAnalise) : 'N/A',
+                    tempoCalculado: tempoEtapaAnteriorAteCertifica,
+                    tempoFormatado: formatarTempo(tempoEtapaAnteriorAteCertifica)
+                });
+            }
+
+            const tempoCertificaAtePagamento = calcularTempoEmMinutosOriginal(horaCertifica, horaPagamento);
+
+            // CALCULAR TEMPO TOTAL
             let tempoTotal;
             if (isStatusTerminal) {
                 const ultimaEntrada = fluxo[fluxo.length - 1].DATA_HORA_ENTRADA;
-                tempoTotal = calcularTempoEmMinutos(primeiraEntrada, ultimaEntrada);
+                tempoTotal = calcularTempoEmMinutosOriginal(primeiraEntrada, ultimaEntrada);
             } else {
                 const agora = new Date();
-                tempoTotal = calcularTempoEmMinutos(primeiraEntrada, agora);
+                tempoTotal = calcularTempoEmMinutosOriginal(primeiraEntrada, agora);
             }
-            
-            const tempoAtePagamento = calcularTempoEmMinutos(primeiraEntrada, horaPagamento);
-            
-            // Flags
+
+            // APLICAR DESCONTO DE ALMOÇO NO TEMPO TOTAL (se necessário)
+            let tempoTotalOriginal = tempoTotal;
+            if (tempoTotal && primeiraEntrada && horaPagamento) {
+                const horaEntrada = new Date(primeiraEntrada).getHours();
+                const horaPago = new Date(horaPagamento).getHours();
+                
+                // Se entrou antes das 13h, foi pago depois das 13h e tempo > 2:30h
+                if (horaEntrada < 13 && horaPago >= 13 && tempoTotal > 150) {
+                    tempoTotal = tempoTotal - 60; // Descontar 1 hora
+                    console.log(`Desconto de almoço aplicado no tempo total da proposta ${item.NUMERO}: ${tempoTotalOriginal}min → ${tempoTotal}min`);
+                }
+            }
+
+            // CALCULAR TEMPO ATÉ PAGAMENTO
+            const tempoAtePagamento = calcularTempoEmMinutosOriginal(primeiraEntrada, horaPagamento);
+
+            // FLAGS (usar o tempo total já com desconto aplicado)
             const tempoTotalExcedido = tempoTotal > 150;
             const tempoEmTempoReal = !isStatusTerminal;
-            
-            return {
+
+            // Criar o objeto da proposta
+            let propostaProcessada = {
                 id: `${item.DATA}-${item.NUMERO}`,
                 numero: item.NUMERO,
                 cedente: item.CEDENTE,
@@ -430,34 +453,34 @@ function processarDados(data) {
                 valorAprovado: parseFloat(item.VLR_APR_DIR) || parseFloat(item.VLR_APROVADO) || parseFloat(item.VALOR_APROVADO) || 0,
                 horaEntrada: primeiraEntrada,
                 horaAnalise: horaAnalise,
-                tempoAteAnalise: temposProcessados.tempoAteAnalise.tempoFinal,
-                tempoAteAnaliseOriginal: temposProcessados.tempoAteAnalise.tempoOriginal,
+                tempoAteAnalise: tempoAteAnalise,
                 horaPendencia: horaPendencia,
-                tempoAtePendencia: temposProcessados.tempoAtePendencia.tempoFinal,
-                tempoAtePendenciaOriginal: temposProcessados.tempoAtePendencia.tempoOriginal,
-                tempoAnaliseAtePendencia: temposProcessados.tempoAnaliseAtePendencia.tempoFinal,
-                tempoAnaliseAtePendenciaOriginal: temposProcessados.tempoAnaliseAtePendencia.tempoOriginal,
+                tempoAtePendencia: tempoAtePendencia,
+                tempoAnaliseAtePendencia: tempoAnaliseAtePendencia,
                 horaChecagem: horaChecagem,
-                tempoAteChecagem: temposProcessados.tempoAteChecagem.tempoFinal,
-                tempoAteChecagemOriginal: temposProcessados.tempoAteChecagem.tempoOriginal,
+                tempoAteChecagem: tempoAteChecagem,
                 horaCertifica: horaCertifica,
-                tempoAteCertifica: temposProcessados.tempoAteCertifica.tempoFinal,
-                tempoAteCertificaOriginal: temposProcessados.tempoAteCertifica.tempoOriginal,
+                tempoAteCertifica: tempoAteCertifica,
                 tempoEtapaAnteriorAteCertifica: tempoEtapaAnteriorAteCertifica,
-                tempoEtapaAnteriorAteCertificaOriginal: temposProcessados.tempoEtapaAnteriorAteCertifica.tempoOriginal,
                 horaPagamento: horaPagamento,
-                tempoCertificaAtePagamento: temposProcessados.tempoCertificaAtePagamento.tempoFinal,
-                tempoCertificaAtePagamentoOriginal: temposProcessados.tempoCertificaAtePagamento.tempoOriginal,
+                tempoCertificaAtePagamento: tempoCertificaAtePagamento,
                 statusAtual: statusAtual,
                 statusSimplificado: statusSimplificado,
                 pesoStatus: getPesoStatus(statusSimplificado),
                 tempoTotal: tempoTotal !== null ? Number(tempoTotal) : null,
+                tempoTotalOriginal: tempoTotalOriginal !== null ? Number(tempoTotalOriginal) : null, // Guardar o original
                 tempoTotalExcedido: tempoTotalExcedido,
                 tempoEmTempoReal: tempoEmTempoReal,
                 tempoAtePagamento: tempoAtePagamento !== null ? Number(tempoAtePagamento) : null,
                 fluxoCompleto: fluxo,
                 observacoes: observacoes
             };
+
+            // APLICAR DESCONTO DE ALMOÇO NOS TEMPOS ESPECÍFICOS (períodos individuais)
+            propostaProcessada = aplicarDescontoAlmocoNosTempos(propostaProcessada);
+
+            return propostaProcessada;
+            
         } catch (error) {
             console.error("Erro ao processar item:", error, item);
             return null;
@@ -476,6 +499,32 @@ function calcularTempoEmMinutosOriginal(dataInicio, dataFim) {
     
     return Math.round((fim - inicio) / (1000 * 60));
 }
+
+// Função simplificada para tempo real (mantém a lógica simples para os timers)
+function calcularTempoComDescontoAlmoco(dataInicio, dataFim = null) {
+    if (!dataInicio) return null;
+    
+    const inicio = new Date(dataInicio);
+    const fim = dataFim ? new Date(dataFim) : new Date();
+    
+    let tempoDecorrido = Math.floor((fim - inicio) / (1000 * 60)); // Em minutos
+    
+    // Lógica simples para tempo real: se entrou antes das 13h e passou das 13h
+    const horaEntrada = inicio.getHours();
+    const entrouAntesDas13 = horaEntrada < 13;
+    const horaAtual = fim.getHours();
+    const minutoAtual = fim.getMinutes();
+    const passouDas13 = horaAtual > 13 || (horaAtual === 13 && minutoAtual > 0);
+    
+    if (entrouAntesDas13 && passouDas13) {
+        tempoDecorrido -= 60; // Descontar 1 hora
+    }
+    
+    return tempoDecorrido;
+}
+
+// Tornar a função global para uso em outros arquivos
+window.calcularTempoComDescontoAlmoco = calcularTempoComDescontoAlmoco;
 
 // Modificar a função filtrarPropostas para incluir o filtro por usuário e torná-la global
 window.filtrarPropostas = function() {
@@ -930,8 +979,6 @@ async function atualizarValorAcumuladoInterface() {
     }
 }
 
-
-
 // VOLTAR a função atualizarInformacoesMetas para ser SÍNCRONA (como era antes)
 function atualizarInformacoesMetas() {
     console.log('📊 Atualizando informações de metas...');
@@ -974,3 +1021,118 @@ function atualizarInformacoesMetas() {
 window.buscarDadosMesAtualCompleto = buscarDadosMesAtualCompleto;
 window.calcularValorAcumuladoMesAtual = calcularValorAcumuladoMesAtual;
 window.atualizarValorAcumuladoInterface = atualizarValorAcumuladoInterface;
+
+// Função para aplicar desconto de almoço em períodos específicos (APENAS UMA VEZ)
+function aplicarDescontoAlmocoNosTempos(proposta) {
+    // Condição geral: entrou antes das 13h e foi paga depois das 13h
+    if (!proposta.horaEntrada || !proposta.horaPagamento) return proposta;
+    
+    const horaEntrada = new Date(proposta.horaEntrada).getHours();
+    const horaPagamento = new Date(proposta.horaPagamento).getHours();
+    
+    if (horaEntrada >= 13 || horaPagamento <= 13) {
+        return proposta; // Não aplica desconto
+    }
+    
+    console.log(`Analisando desconto de almoço para proposta ${proposta.numero}`);
+    
+    // Buscar qual período passou pelo horário de almoço (12h-14h) e durou mais de 1h
+    const periodos = [
+        {
+            nome: 'tempoAteAnalise',
+            inicio: proposta.horaEntrada,
+            fim: proposta.horaAnalise,
+            tempo: proposta.tempoAteAnalise
+        },
+        {
+            nome: 'tempoAnaliseAtePendencia', 
+            inicio: proposta.horaAnalise,
+            fim: proposta.horaPendencia,
+            tempo: proposta.tempoAnaliseAtePendencia
+        },
+        {
+            nome: 'tempoEtapaAnteriorAteCertifica',
+            inicio: proposta.horaPendencia || proposta.horaAnalise || proposta.horaEntrada,
+            fim: proposta.horaCertifica,
+            tempo: proposta.tempoEtapaAnteriorAteCertifica
+        },
+        {
+            nome: 'tempoCertificaAtePagamento',
+            inicio: proposta.horaCertifica,
+            fim: proposta.horaPagamento,
+            tempo: proposta.tempoCertificaAtePagamento
+        }
+    ];
+    
+    // Verificar cada período e aplicar desconto APENAS NO PRIMEIRO que atender aos critérios
+    let descontoJaAplicado = false;
+    
+    for (const periodo of periodos) {
+        if (descontoJaAplicado) break; // Sai do loop se já aplicou desconto
+        
+        if (periodo.inicio && periodo.fim && periodo.tempo && periodo.tempo >= 60) {
+            const inicioData = new Date(periodo.inicio);
+            const fimData = new Date(periodo.fim);
+            
+            const inicioHora = inicioData.getHours();
+            const inicioMinuto = inicioData.getMinutes();
+            const fimHora = fimData.getHours();
+            const fimMinuto = fimData.getMinutes();
+            
+            // Converter para minutos para comparação mais precisa
+            const inicioTotalMinutos = inicioHora * 60 + inicioMinuto;
+            const fimTotalMinutos = fimHora * 60 + fimMinuto;
+            const inicio12h = 12 * 60; // 12:00 = 720 minutos
+            const fim14h = 14 * 60;    // 14:00 = 840 minutos
+            
+            // Verificar se a mudança de status aconteceu ENTRE 12h e 14h
+            if (inicioTotalMinutos < fim14h && fimTotalMinutos > inicio12h) {
+                // Salvar o tempo original se ainda não foi salvo
+                if (!proposta[`${periodo.nome}Original`]) {
+                    proposta[`${periodo.nome}Original`] = periodo.tempo;
+                }
+                
+                // Aplicar desconto de 1 hora neste período específico
+                proposta[periodo.nome] = periodo.tempo - 60;
+                descontoJaAplicado = true; // Marcar que já aplicou desconto
+                
+                console.log(`Desconto aplicado APENAS no período ${periodo.nome}: ${periodo.tempo}min → ${periodo.tempo - 60}min (proposta ${proposta.numero})`);
+                console.log(`Período: ${formatarHora(periodo.inicio)} → ${formatarHora(periodo.fim)}`);
+            }
+        }
+    }
+    
+    if (!descontoJaAplicado) {
+        console.log(`Nenhum período elegível para desconto encontrado na proposta ${proposta.numero}`);
+    }
+    
+    return proposta;
+}
+// Se houver uma função de atualização automática, modificar para preservar dados:
+function atualizarDadosAutomaticamente() {
+    // Verificar se está no modo TV
+    const isModoTV = document.body.classList.contains('tv-mode');
+    
+    if (isModoTV) {
+        console.log('Atualização automática no modo TV - preservando formatação');
+        
+        // Buscar novos dados
+        buscarDados().then(() => {
+            // Garantir que o cabeçalho esteja correto após a atualização
+            setTimeout(() => {
+                if (document.body.classList.contains('tv-mode')) {
+                    ajustarCabecalhoTabelaModoTV();
+                    aplicarClassesColunas();
+                }
+            }, 100);
+        });
+    } else {
+        // Atualização normal
+        buscarDados();
+    }
+}
+
+// Iniciar a atualização automática quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', function() {
+    atualizarDadosAutomaticamente();
+});

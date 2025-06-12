@@ -8,11 +8,10 @@ function reconfigurarEventListenersTabela() {
     }, 100);
 }
 
-// Função principal para atualizar os dados
+// Modificar a função atualizarDados para preservar filtros:
 async function atualizarDados() {
     console.log('Iniciando atualização de dados');
     
-    // Verificar se já existe uma busca em andamento
     if (APP_STATE.buscaEmAndamento) {
         console.log('Busca já em andamento, ignorando nova solicitação de atualização');
         return;
@@ -27,27 +26,28 @@ async function atualizarDados() {
     console.log(`Renderizando tabela com ${propostasOrdenadas.length} propostas`);
     
     atualizarEstatisticas(propostasFiltradas);
-    renderizarTabela(propostasOrdenadas, novasPropostasIds);
+    
+    // USAR RENDERIZAÇÃO UNIVERSAL (única mudança que mantemos)
+    if (typeof renderizarTabelaUniversal === 'function') {
+        renderizarTabelaUniversal(propostasOrdenadas, novasPropostasIds);
+    } else {
+        renderizarTabela(propostasOrdenadas, novasPropostasIds);
+    }
+    
     atualizarOperacoesExcedidas();
     atualizarHoraAtualizacao();
     
-    // ADICIONAR ESTAS LINHAS:
     calcularSomaValoresAprovados();
     
-    // Atualizar label dos borderôs com nova porcentagem
     if (typeof atualizarLabelBorderos === 'function') {
         atualizarLabelBorderos();
     }
     
-    // Manter o estado visual da ordenação
     definirEstadoInicialOrdenacao();
-    
-    // RECONFIGURAR EVENT LISTENERS
     reconfigurarEventListenersTabela();
     
     console.log('Atualização de dados concluída');
 }
-
 
 // Função para definir o intervalo de datas
 function definirIntervaloDatas(inicio, fim) {
@@ -91,29 +91,18 @@ function definirIntervaloRelativo(dias) {
     definirIntervaloDatas(inicio, hoje);
 }
 
-// Função para iniciar a atualização automática
+// Se houver um timer de atualização automática, modificar para salvar estado:
 function iniciarAtualizacaoAutomatica() {
-    // Verificar se já existe um intervalo configurado
-    if (window.APP_STATE.intervalId) {
-        console.log("Atualização automática já está configurada. Intervalo ID:", window.APP_STATE.intervalId);
-        return; // Sair da função sem criar um novo intervalo
-    }
-    
-    console.log("Configurando atualização automática com intervalo de", CONFIG.REFRESH_INTERVAL, "ms");
-    
-    // Configurar o intervalo
-    window.APP_STATE.intervalId = setInterval(() => {
-        if (window.APP_STATE.atualizacaoAutomatica && !window.APP_STATE.buscaEmAndamento) {
-            console.log("Executando atualização automática");
-            atualizarDados();
-        } else {
-            console.log("Pulando atualização automática:", 
-                window.APP_STATE.atualizacaoAutomatica ? "Atualização automática ativada" : "Atualização automática desativada",
-                window.APP_STATE.buscaEmAndamento ? "Busca em andamento" : "Nenhuma busca em andamento");
-        }
-    }, CONFIG.REFRESH_INTERVAL || 300000); // Usar 5 minutos como fallback
-    
-    console.log("Atualização automática configurada. Intervalo ID:", window.APP_STATE.intervalId);
+    setInterval(() => {
+        console.log('⏰ Atualização automática iniciada');
+        
+        // Salvar estado antes da atualização
+        salvarEstadoFiltros();
+        
+        // Executar atualização
+        atualizarDados();
+        
+    }, 30000); // 30 segundos
 }
 
 // Tornar a função global
@@ -156,10 +145,15 @@ function configurarEventListenersFiltros() {
         const propostasFiltradas = filtrarPropostas();
         const propostasOrdenadas = ordenarPropostas(propostasFiltradas);
         atualizarEstatisticas(propostasFiltradas);
-        renderizarTabela(propostasOrdenadas);
-        atualizarOperacoesExcedidas();
         
-        // ADICIONAR ESTAS LINHAS:
+        // USAR RENDERIZAÇÃO UNIVERSAL (única mudança)
+        if (typeof renderizarTabelaUniversal === 'function') {
+            renderizarTabelaUniversal(propostasOrdenadas);
+        } else {
+            renderizarTabela(propostasOrdenadas);
+        }
+        
+        atualizarOperacoesExcedidas();
         calcularSomaValoresAprovados();
         if (typeof atualizarLabelBorderos === 'function') {
             atualizarLabelBorderos();
@@ -172,10 +166,15 @@ function configurarEventListenersFiltros() {
         const propostasFiltradas = filtrarPropostas();
         const propostasOrdenadas = ordenarPropostas(propostasFiltradas);
         atualizarEstatisticas(propostasFiltradas);
-        renderizarTabela(propostasOrdenadas);
-        atualizarOperacoesExcedidas();
         
-        // ADICIONAR ESTAS LINHAS:
+        // USAR RENDERIZAÇÃO UNIVERSAL (única mudança)
+        if (typeof renderizarTabelaUniversal === 'function') {
+            renderizarTabelaUniversal(propostasOrdenadas);
+        } else {
+            renderizarTabela(propostasOrdenadas);
+        }
+        
+        atualizarOperacoesExcedidas();
         calcularSomaValoresAprovados();
         if (typeof atualizarLabelBorderos === 'function') {
             atualizarLabelBorderos();
@@ -187,7 +186,13 @@ function configurarEventListenersFiltros() {
         APP_STATE.ordenacao = this.value;
         const propostasFiltradas = filtrarPropostas();
         const propostasOrdenadas = ordenarPropostas(propostasFiltradas);
-        renderizarTabela(propostasOrdenadas);
+        
+        // USAR RENDERIZAÇÃO UNIVERSAL (única mudança)
+        if (typeof renderizarTabelaUniversal === 'function') {
+            renderizarTabelaUniversal(propostasOrdenadas);
+        } else {
+            renderizarTabela(propostasOrdenadas);
+        }
     });
 }
 
