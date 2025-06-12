@@ -1,1041 +1,339 @@
-// Função para obter classe CSS baseada no status
-function getStatusClass(status) {
-    // Verificar se o status contém o texto específico (independente do número)
-    if (status.includes("PAGO")) return "status-pago";
-    if (status.includes("PENDÊNCIA")) return "status-pendencia";
-    if (status.includes("DIGITANDO")) return "status-digitando";
-    if (status.includes("AGUARD. ANÁLISE")) return "status-aguardando";
-    if (status.includes("OPER. ANALISANDO")) return "status-analisando";
-    if (status.includes("Q CERT. ASSINAT.")) return "status-assinatura";
-    if (status.includes("CHECAGEM")) return "status-checagem";
-    if (status.includes("POSTERGADO")) return "status-postergado";
-    if (status.includes("CEDENTE DESISTIU")) return "status-desistiu";
-    if (status.includes("RECUSADO")) return "status-recusado";
-    if (status.includes("PENDÊNCIA")) return "status-pendencia";
-    
-    // Se não encontrou nenhuma correspondência, retornar string vazia
-    console.warn("Nenhuma classe encontrada para status:", status);
-    return "";
-}
-
-// Função para filtrar propostas
-function filtrarPropostas() {
-    return APP_STATE.propostas.filter(p => {
-        // Filtro de status
-        if (APP_STATE.filtroStatus !== 'todos' && p.statusAtual !== APP_STATE.filtroStatus) {
-            return false;
-        }
-        
-        // Filtro de cedente
-        if (APP_STATE.filtroCedente && !p.cedente.toLowerCase().includes(APP_STATE.filtroCedente.toLowerCase())) {
-            return false;
-        }
-        
-        return true;
+// Função para carregar scripts dinamicamente
+function carregarScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => {
+            console.log(`✅ ${src.split('/').pop()} carregado`);
+            resolve();
+        };
+        script.onerror = () => {
+            console.warn(`⚠️ Erro ao carregar ${src}, continuando...`);
+            resolve(); // Resolver mesmo com erro para não travar o carregamento
+        };
+        document.head.appendChild(script);
     });
 }
 
-// Função para ordenar propostas
-function ordenarPropostas(propostas) {
-    const ordenacao = APP_STATE.ordenacao;
-    
-    return [...propostas].sort((a, b) => {
-        switch (ordenacao) {
-            case 'numero_desc':
-                return b.numero - a.numero;
-            case 'numero_asc':
-                return a.numero - b.numero;
-                
-            case 'hora_entrada_desc':
-                return compareDates(b.horaEntrada, a.horaEntrada);
-            case 'hora_entrada_asc':
-                return compareDates(a.horaEntrada, b.horaEntrada);
-                
-            case 'status_asc':
-                return a.pesoStatus - b.pesoStatus;
-            case 'status_desc':
-                return b.pesoStatus - a.pesoStatus;
-                
-            case 'data_desc':
-                return compareDates(b.data, a.data);
-            case 'data_asc':
-                return compareDates(a.data, b.data);
-                
-            case 'cedente_asc':
-                return a.cedente.localeCompare(b.cedente);
-            case 'cedente_desc':
-                return b.cedente.localeCompare(a.cedente);
-                
-            case 'tempo_total_desc':
-                return compareNumbers(b.tempoTotal, a.tempoTotal);
-            case 'tempo_total_asc':
-                return compareNumbers(a.tempoTotal, b.tempoTotal);
-                
-            case 'analise_desc':
-                return compareDates(b.horaAnalise, a.horaAnalise);
-            case 'analise_asc':
-                return compareDates(a.horaAnalise, b.horaAnalise);
-                
-            case 'checagem_desc':
-                return compareDates(b.horaChecagem, a.horaChecagem);
-            case 'checagem_asc':
-                return compareDates(a.horaChecagem, b.horaChecagem);
-                
-            case 'certificacao_desc':
-                return compareDates(b.horaCertifica, a.horaCertifica);
-            case 'certificacao_asc':
-                return compareDates(a.horaCertifica, b.horaCertifica);
-                
-            case 'pagamento_desc':
-                return compareDates(b.horaPagamento, a.horaPagamento);
+// Lista de arquivos para carregar - CAMINHOS CORRETOS
+const arquivos = [
+    './js/components/status-utils.js',
+    './js/components/filters-sorting.js',
+    './js/components/statistics.js', 
+    './js/components/table-renderer.js',
+    './js/components/tv-mode.js',
+    './js/components/tooltips-modals.js'
+];
 
-            case 'pagamento_asc':
-                return compareDates(a.horaPagamento, b.horaPagamento);
-
-            case 'pendencia_desc':
-                return ordenarPorData(b.horaPendencia, a.horaPendencia);
-
-            case 'pendencia_asc':
-                return ordenarPorData(a.horaPendencia, b.horaPendencia);
-                
-            default:
-                return 0;
-        }
-    });
-}
-
-// Modificar a função atualizarEstatisticas para usar async/await
-async function atualizarEstatisticas(propostasFiltradas) {
-    document.getElementById('total-propostas').textContent = propostasFiltradas.length;
+// Carregar todos os arquivos
+async function inicializarComponentes() {
+    console.log('🚀 Carregando componentes de UI...');
     
-    const propostasPagas = propostasFiltradas.filter(p => p.statusSimplificado === "PAGO");
-    document.getElementById('total-pagas').textContent = propostasPagas.length;
-    
-    const propostasEmProcessamento = propostasFiltradas.filter(p => {
-        const emProcessamento = 
-            p.statusSimplificado !== "PAGO" && 
-            p.statusSimplificado !== "CEDENTE DESISTIU" && 
-            p.statusSimplificado !== "RECUSADO" &&
-            p.statusSimplificado !== "POSTERGADO";
-        return emProcessamento;
-    });
-    
-    document.getElementById('total-processamento').textContent = propostasEmProcessamento.length;
-    
-    // Calcular tempo médio até pagamento
-    const propostasComPagamento = propostasFiltradas.filter(p => p.tempoAtePagamento);
-    const tempoTotal = propostasComPagamento.reduce((acc, p) => acc + p.tempoAtePagamento, 0);
-    const tempoMedio = propostasComPagamento.length ? Math.round(tempoTotal / propostasComPagamento.length) : 0;
-    document.getElementById('tempo-medio').textContent = formatarTempo(tempoMedio);
-    
-    // Calcular soma dos borderôs pagos (APENAS DO PERÍODO FILTRADO)
-    let somaValoresAprovados = 0;
-    let contadorComValor = 0;
-    
-    propostasPagas.forEach(proposta => {
-        let valorAprovado = 0;
-        const camposValor = ['VLR_APR_DIR', 'VLR_APROVADO', 'VALOR_APROVADO', 'valorAprovado'];
+    try {
+        // Carregar todos os scripts em paralelo
+        await Promise.all(arquivos.map(carregarScript));
         
-        for (const campo of camposValor) {
-            if (proposta[campo] && parseFloat(proposta[campo]) > 0) {
-                valorAprovado = parseFloat(proposta[campo]);
-                break;
+        console.log('✅ Todos os componentes carregados!');
+        
+        // Aguardar um pouco para garantir que tudo foi inicializado
+        setTimeout(() => {
+            // Inicializar o modo TV
+            if (typeof configurarModoTV === 'function') {
+                configurarModoTV();
             }
-        }
+            
+            // Configurar filtros e ordenação
+            if (typeof window.configurarEventListenersFiltros === 'function') {
+                window.configurarEventListenersFiltros();
+            }
+            
+            if (typeof window.configurarOrdenacaoPorCabecalho === 'function') {
+                window.configurarOrdenacaoPorCabecalho();
+            }
+            
+            // Marcar como carregado
+            window.uiComponentesCarregados = true;
+            
+            console.log('🎉 Componentes de UI inicializados com sucesso!');
+        }, 500);
         
-        if (valorAprovado > 0) {
-            somaValoresAprovados += valorAprovado;
-            contadorComValor++;
-        }
-    });
+    } catch (error) {
+        console.error('❌ Erro ao carregar componentes:', error);
+        
+        // Fallback: usar componentes inline se existirem
+        console.log('🔄 Tentando usar componentes inline...');
+        usarComponentesInline();
+    }
+}
+
+// Função de fallback para usar componentes que já estão no arquivo principal
+function usarComponentesInline() {
+    console.log('📦 Usando componentes inline como fallback...');
     
-    // Atualizar borderôs pagos (do período filtrado)
-    const elementoSoma = document.getElementById('soma-valores-aprovados');
-    if (elementoSoma) {
-        if (typeof formatarMoedaPersonalizada === 'function') {
-            elementoSoma.textContent = formatarMoedaPersonalizada(somaValoresAprovados, false);
+    // Verificar se as funções principais já existem no escopo global
+    const funcoesEssenciais = [
+        'getStatusClass',
+        'filtrarPropostas', 
+        'ordenarPropostas',
+        'atualizarEstatisticas',
+        'renderizarTabela',
+        'mostrarObservacoes',
+        'mostrarHistoricoStatus'
+    ];
+    
+    let componentesDisponiveis = 0;
+    
+    funcoesEssenciais.forEach(funcName => {
+        if (typeof window[funcName] === 'function') {
+            componentesDisponiveis++;
+            console.log(`✅ ${funcName} disponível`);
         } else {
-            elementoSoma.textContent = `R$ ${somaValoresAprovados.toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            })}`;
+            console.warn(`⚠️ ${funcName} não disponível`);
         }
-    }
-    
-    // Atualizar o estado global
-    if (window.APP_STATE) {
-        window.APP_STATE.somaValoresAprovados = somaValoresAprovados;
-    }
-    
-    // NOVO: Atualizar valor acumulado do mês (INDEPENDENTE DOS FILTROS)
-    if (typeof atualizarValorAcumuladoInterface === 'function') {
-        try {
-            await atualizarValorAcumuladoInterface();
-        } catch (error) {
-            console.error('Erro ao atualizar valor acumulado na interface:', error);
-        }
-    }
-    
-    console.log(`💰 Borderôs pagos (período filtrado): R$ ${somaValoresAprovados.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${contadorComValor} propostas)`);
-}
-// Encontrar a seção da coluna QCERT (aproximadamente linha 150-170):
-
-// QCERT - usando diretamente a propriedade calculada
-
-
-
-// Função para atualizar a seção de operações excedidas
-function atualizarOperacoesExcedidas() {
-    console.log("Atualizando seção de operações excedidas com filtros aplicados");
-    
-    // Obter as propostas já filtradas
-    const propostasFiltradas = filtrarPropostas();
-    console.log(`Usando ${propostasFiltradas.length} propostas filtradas para operações excedidas`);
-    
-    // Filtrar apenas propostas PAGAS com tempo excedido
-    const propostasExcedidas = propostasFiltradas.filter(p => 
-        p.statusSimplificado === "PAGO" && 
-        p.tempoTotalExcedido
-    );
-    
-    console.log(`Encontradas ${propostasExcedidas.length} operações PAGAS com tempo excedido após aplicar filtros`);
-    
-    // Ordenar por tempo total (maior para menor)
-    propostasExcedidas.sort((a, b) => b.tempoTotal - a.tempoTotal);
-    
-    // Obter o container
-    const container = document.getElementById('excedido-container');
-    const lista = document.getElementById('excedido-list');
-    
-    // Limpar a lista
-    lista.innerHTML = '';
-    
-    // Verificar se há operações excedidas
-    if (propostasExcedidas.length === 0) {
-        // Se não houver, ocultar o container
-        container.style.display = 'none';
-        return;
-    }
-    
-    // Se houver, mostrar o container
-    container.style.display = 'block';
-    
-    // Adicionar cada operação excedida à lista
-    propostasExcedidas.forEach(proposta => {
-        // Criar o item da lista
-        const item = document.createElement('div');
-        item.className = 'observation-item';
-        
-        // Formatar o tempo total
-        const tempoFormatado = formatarTempo(proposta.tempoTotal);
-        
-        // Criar o conteúdo do item
-        item.innerHTML = `
-            <div class="observation-header">
-                <span class="observation-number">Proposta #${proposta.numero}</span>
-                <span class="observation-cedente">${proposta.cedente}</span>
-                <span class="observation-time">Tempo Total: <strong>${tempoFormatado}</strong></span>
-            </div>
-            <div class="observation-details">
-                <div class="observation-timestamps">
-                    <span>Entrada: ${formatarDataHora(proposta.horaEntrada)}</span>
-                    <span>Pagamento: ${formatarDataHora(proposta.horaPagamento)}</span>
-                </div>
-                ${proposta.observacoes && proposta.observacoes.length > 0 ? 
-                    `<div class="observation-notes">
-                        <h4>Observações:</h4>
-                        <ul>
-                            ${proposta.observacoes
-                                .filter(obs => obs.USUARIO === 'GER' && obs.OBSERVACAO && obs.OBSERVACAO.includes('Tempo excedido'))
-                                .map(obs => `<li>${obs.OBSERVACAO}</li>`)
-                                .join('')}
-                        </ul>
-                    </div>` : ''}
-            </div>
-        `;
-        
-        // Adicionar o item à lista
-        lista.appendChild(item);
     });
     
-    console.log(`Renderizadas ${propostasExcedidas.length} operações excedidas`);
+    if (componentesDisponiveis >= 4) {
+        console.log(`✅ ${componentesDisponiveis}/${funcoesEssenciais.length} componentes essenciais disponíveis`);
+        window.uiComponentesCarregados = true;
+        
+        // Configurar modo TV se disponível
+        if (typeof configurarModoTV === 'function') {
+            configurarModoTV();
+        }
+        
+        // Tentar configurar filtros
+        setTimeout(() => {
+            if (typeof window.corrigirFiltros === 'function') {
+                window.corrigirFiltros();
+            }
+        }, 1000);
+        
+    } else {
+        console.error(`❌ Apenas ${componentesDisponiveis}/${funcoesEssenciais.length} componentes disponíveis`);
+    }
 }
 
-// Expor a função globalmente
-window.atualizarOperacoesExcedidas = atualizarOperacoesExcedidas;
-
-// Abordagem alternativa para renderizar a tabela no modo TV
-function renderizarTabelaModoTV(propostasFiltradas, novasPropostasIds = []) {
-    const tbody = document.getElementById('propostas-body');
-    if (!tbody) {
-        console.error('Elemento tbody não encontrado');
-        return;
+// Função para criar fallbacks básicos das funções essenciais
+function criarFallbacksBasicos() {
+    console.log('🔧 Criando fallbacks básicos...');
+    
+    // Fallback para getStatusClass
+    if (typeof window.getStatusClass !== 'function') {
+        window.getStatusClass = function(status) {
+            if (!status) return "";
+            if (status.includes("PAGO")) return "status-pago";
+            if (status.includes("PENDÊNCIA")) return "status-pendencia";
+            if (status.includes("DIGITANDO")) return "status-digitando";
+            if (status.includes("AGUARD. ANÁLISE")) return "status-aguardando";
+            if (status.includes("OPER. ANALISANDO")) return "status-analisando";
+            if (status.includes("Q CERT. ASSINAT.")) return "status-assinatura";
+            if (status.includes("CHECAGEM")) return "status-checagem";
+            if (status.includes("POSTERGADO")) return "status-postergado";
+            if (status.includes("CEDENTE DESISTIU")) return "status-desistiu";
+            if (status.includes("RECUSADO")) return "status-recusado";
+            return "";
+        };
+        console.log('✅ getStatusClass fallback criado');
     }
     
-    tbody.innerHTML = '';
-    
-    if (propostasFiltradas.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="10" class="no-data">Nenhuma proposta encontrada</td>`;
-        tbody.appendChild(tr);
-        return;
-    }
-    
-    // Limpar quaisquer temporizadores existentes
-    if (window.tempoRealTimers) {
-        window.tempoRealTimers.forEach(timer => clearInterval(timer));
-    }
-    window.tempoRealTimers = [];
-    
-    console.log('Renderizando tabela no modo TV');
-    
-    propostasFiltradas.forEach(p => {
-        const tr = document.createElement('tr');
-        
-        // Obter a classe de status e aplicar à linha
-        const statusClass = getStatusClass(p.statusAtual);
-        
-        if (statusClass) {
-            tr.className = statusClass;
-        }
-        
-        tr.id = `proposta-${p.id}`;
-        
-        // Adiciona classe para animação se for uma nova proposta
-        if (novasPropostasIds && novasPropostasIds.includes(p.id)) {
-            tr.classList.add('new-row');
-        }
-        
-        // Encontrar a entrada de checagem (status "CHECAGEM")
-        const entradaChecagem = p.fluxoCompleto ? p.fluxoCompleto.find(f => f.STATUS_FLUXO === "CHECAGEM") : null;
-        const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
-        
-        // Calcular o tempo até checagem (da entrada até checagem)
-        const tempoAteChecagem = calcularTempoEmMinutos(p.horaEntrada, horaChecagem);
-        
-        // Criar um ID único para a célula de tempo total
-        const tempoTotalId = `tempo-total-${p.id}`;
-        
-        // Verificar se há observações
-        const temObservacoes = p.observacoes && p.observacoes.length > 0;
-        
-        // Adicionar classe para indicar que há observações
-        const cedenteClass = temObservacoes ? 'has-observations' : '';
-        
-        // Adicionar classe para a célula de status para permitir clique
-        const statusCellClass = 'status-cell';
-        
-        // LÓGICA CORRIGIDA PARA MODO TV: Usar a nova propriedade calculada
-        let tempoParaCertificacao = null;
-        let horaOrigemCertificacao = null;
-        
-        if (p.horaCertifica) {
-            if (p.horaComite) {
-                // Se passou pelo COMITÊ, mostrar tempo do comitê até certificação
-                tempoParaCertificacao = p.tempoComiteAteCertifica;
-                horaOrigemCertificacao = p.horaComite;
-            } else if (p.horaAnalise) {
-                // Se não passou pelo COMITÊ mas passou pela análise, mostrar tempo da análise até certificação
-                tempoParaCertificacao = p.tempoAnaliseAteCertifica;
-                horaOrigemCertificacao = p.horaAnalise;
-            } else {
-                // Se não passou nem pelo comitê nem pela análise, mostrar tempo da entrada até certificação
-                tempoParaCertificacao = p.tempoAteCertifica;
-                horaOrigemCertificacao = p.horaEntrada;
-            }
-        }
-        
-        // Log para depuração
-        if (p.horaCertifica) {
-            console.log(`Proposta ${p.numero}: QCERT em ${formatarHora(p.horaCertifica)}, tempo desde ${p.horaComite ? 'COMITÊ' : (p.horaAnalise ? 'ANÁLISE' : 'ENTRADA')}: ${tempoParaCertificacao} min`);
-        }
-        
-        // Adicionar células à linha - USANDO formatarHoraTempo corrigida
-        tr.innerHTML = `
-            <td class="text-center" id="${tempoTotalId}">${formatarTempo(p.tempoTotal, true, p.tempoEmTempoReal)}</td>
-            <td class="text-center">${formatarHora(p.horaEntrada)}</td>
-            <td class="text-center">${p.numero}</td>
-            <td class="text-center cedente-cell ${cedenteClass}" data-proposta-id="${p.id}">${p.cedente}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise, p.tempoAteAnaliseOriginal)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia, p.tempoAnaliseAtePendenciaOriginal)}</td>
-            <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem, null)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica, p.tempoEtapaAnteriorAteCertificaOriginal)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento, p.tempoCertificaAtePagamentoOriginal)}</td>
-            <td class="text-center ${statusCellClass}" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
-        `;
-        
-        tbody.appendChild(tr);
-        
-        // Se o tempo está sendo calculado em tempo real, configurar um temporizador para atualizá-lo
-        if (p.tempoEmTempoReal && p.horaEntrada) {
-            const timer = setInterval(() => {
-                const tempoDecorrido = calcularTempoComDescontoAlmoco(p.horaEntrada);
-                
-                // Atualizar o elemento na tabela
-                const tempoTotalCell = document.getElementById(tempoTotalId);
-                if (tempoTotalCell) {
-                    tempoTotalCell.innerHTML = formatarTempo(tempoDecorrido, true, true);
-                }
-            }, 60000);
-            
-            window.tempoRealTimers.push(timer);
-        }
-        
-        // Adicionar event listeners após a renderização
-        setTimeout(() => {
-            // Event listener para a célula do cedente
-            if (temObservacoes) {
-                const cedenteCell = tbody.querySelector(`.cedente-cell[data-proposta-id="${p.id}"]`);
-                if (cedenteCell) {
-                    cedenteCell.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        mostrarObservacoes(p);
-                    });
-                }
+    // Fallback para filtrarPropostas
+    if (typeof window.filtrarPropostas !== 'function') {
+        window.filtrarPropostas = function() {
+            if (!window.APP_STATE || !window.APP_STATE.propostas) {
+                return [];
             }
             
-            // Event listener para a célula de status
-            const statusCell = tbody.querySelector(`.status-cell[data-proposta-id="${p.id}"]`);
-            if (statusCell) {
-                statusCell.style.cursor = 'pointer';
-                statusCell.title = 'Clique para ver o histórico de status';
+            return window.APP_STATE.propostas.filter(p => {
+                // Filtro de status
+                if (window.APP_STATE.filtroStatus !== 'todos' && p.statusAtual !== window.APP_STATE.filtroStatus) {
+                    return false;
+                }
                 
-                statusCell.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    mostrarHistoricoStatus(p);
+                // Filtro de cedente
+                if (window.APP_STATE.filtroCedente && !p.cedente.toLowerCase().includes(window.APP_STATE.filtroCedente.toLowerCase())) {
+                    return false;
+                }
+                
+                return true;
+            });
+        };
+        console.log('✅ filtrarPropostas fallback criado');
+    }
+    
+    // Fallback para ordenarPropostas
+    if (typeof window.ordenarPropostas !== 'function') {
+        window.ordenarPropostas = function(propostas) {
+            if (!Array.isArray(propostas)) return [];
+            
+            const ordenacao = window.APP_STATE ? window.APP_STATE.ordenacao : 'data_desc';
+            
+            return [...propostas].sort((a, b) => {
+                switch (ordenacao) {
+                    case 'numero_desc':
+                        return b.numero - a.numero;
+                    case 'numero_asc':
+                        return a.numero - b.numero;
+                    case 'data_desc':
+                        return new Date(b.data || 0) - new Date(a.data || 0);
+                    case 'data_asc':
+                        return new Date(a.data || 0) - new Date(b.data || 0);
+                    case 'tempo_total_desc':
+                        return (b.tempoTotal || 0) - (a.tempoTotal || 0);
+                    case 'tempo_total_asc':
+                        return (a.tempoTotal || 0) - (b.tempoTotal || 0);
+                    case 'cedente_asc':
+                        return (a.cedente || '').localeCompare(b.cedente || '');
+                    case 'cedente_desc':
+                        return (b.cedente || '').localeCompare(a.cedente || '');
+                    default:
+                        return 0;
+                }
+            });
+        };
+        console.log('✅ ordenarPropostas fallback criado');
+    }
+    
+    // Fallback para renderizarTabela
+    if (typeof window.renderizarTabela !== 'function') {
+        window.renderizarTabela = function(propostasFiltradas) {
+            const tbody = document.getElementById('propostas-body');
+            if (!tbody) {
+                console.error('Elemento tbody não encontrado');
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            
+            if (!Array.isArray(propostasFiltradas) || propostasFiltradas.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="11" class="no-data">Nenhuma proposta encontrada</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+            
+            propostasFiltradas.forEach(p => {
+                const tr = document.createElement('tr');
+                const statusClass = window.getStatusClass(p.statusAtual);
+                
+                if (statusClass) {
+                    tr.className = statusClass;
+                }
+                
+                tr.setAttribute('data-id', p.id);
+                
+                // Funções auxiliares com fallback
+                const formatarTempo = window.formatarTempo || ((min) => {
+                    if (!min || min === 0) return '--';
+                    const horas = Math.floor(min / 60);
+                    const mins = min % 60;
+                    return horas > 0 ? `${horas}h${mins}m` : `${mins}m`;
                 });
-            }
-        }, 0);
-    });
-    
-    console.log(`Tabela no modo TV renderizada com ${propostasFiltradas.length} propostas.`);
-}
-
-// Função para renderizar tabela - CORRIGIDA
-function renderizarTabela(propostasFiltradas, novasPropostasIds = []) {
-    const tbody = document.getElementById('propostas-body');
-    
-    if (!tbody) {
-        console.error('Elemento tbody não encontrado');
-        return;
-    }
-    
-    // Limpar temporizadores existentes
-    if (window.tempoRealTimers) {
-        window.tempoRealTimers.forEach(timer => clearInterval(timer));
-    }
-    window.tempoRealTimers = [];
-    
-    // Limpar o corpo da tabela
-    tbody.innerHTML = '';
-    
-    if (propostasFiltradas.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="11" class="no-data">Nenhuma proposta encontrada</td>`;
-        tbody.appendChild(tr);
-        return;
-    }
-    
-    // Adicionar cada proposta à tabela
-    propostasFiltradas.forEach(p => {
-        // Obter a classe de status
-        const statusClass = getStatusClass(p.statusAtual);
-        
-        // Criar a linha da tabela
-        const tr = document.createElement('tr');
-        tr.className = statusClass;
-        tr.setAttribute('data-id', p.id);
-        tr.id = `proposta-${p.id}`;
-        
-        // Verificar se é uma nova proposta
-        if (novasPropostasIds && novasPropostasIds.includes(p.id)) {
-            tr.classList.add('nova-proposta');
-        }
-        
-        // Verificar se há observações
-        const temObservacoes = p.observacoes && p.observacoes.length > 0;
-        
-        // Encontrar a entrada de checagem
-        const entradaChecagem = p.fluxoCompleto ? p.fluxoCompleto.find(f => f.STATUS_FLUXO === "CHECAGEM") : null;
-        const horaChecagem = entradaChecagem ? entradaChecagem.DATA_HORA_ENTRADA : null;
-        const tempoAteChecagem = calcularTempoEmMinutos(p.horaEntrada, horaChecagem);
-        
-        // Criar ID único para tempo total (para atualização em tempo real)
-        const tempoTotalId = `tempo-total-${p.id}`;
-        
-        // Função auxiliar para formatar tempo com desconto
-        const formatarTempoComDesconto = (tempo, tempoOriginal) => {
-            if (!tempo) return '--';
-            
-            const houveDesconto = tempoOriginal && tempoOriginal > tempo;
-            if (houveDesconto) {
-                return `<span class="tempo-com-desconto" data-tempo-original="${tempoOriginal}" data-tempo-ajustado="${tempo}">${formatarTempo(tempo)}*</span>`;
-            }
-            return formatarTempo(tempo);
-        };
-        
-        // Função auxiliar para formatar hora e tempo com desconto
-        const formatarHoraTempoComDesconto = (hora, tempo, tempoOriginal) => {
-            if (!hora) return '--';
-            
-            const horaFormatada = formatarHora(hora);
-            if (!tempo) return horaFormatada;
-            
-            const tempoFormatado = formatarTempoComDesconto(tempo, tempoOriginal);
-            return `${horaFormatada}<br><small>(${tempoFormatado})</small>`;
-        };
-        
-        // LÓGICA CORRIGIDA: Determinar qual tempo mostrar na coluna QCERT
-        let tempoParaCertificacao = null;
-        let horaOrigemCertificacao = null;
-        
-        if (p.horaCertifica) {
-            if (p.horaComite) {
-                // Se passou pelo COMITÊ, mostrar tempo do comitê até certificação
-                tempoParaCertificacao = p.tempoComiteAteCertifica;
-                horaOrigemCertificacao = p.horaComite;
-            } else if (p.horaAnalise) {
-                // Se não passou pelo COMITÊ mas passou pela análise, mostrar tempo da análise até certificação
-                tempoParaCertificacao = p.tempoAnaliseAteCertifica;
-                horaOrigemCertificacao = p.horaAnalise;
-            } else {
-                // Se não passou nem pelo comitê nem pela análise, mostrar tempo da entrada até certificação
-                tempoParaCertificacao = p.tempoAteCertifica;
-                horaOrigemCertificacao = p.horaEntrada;
-            }
-        }
-        
-        // Log para depuração
-        if (p.horaCertifica) {
-            console.log(`Proposta ${p.numero}: QCERT em ${formatarHora(p.horaCertifica)}, tempo desde ${p.horaComite ? 'COMITÊ' : (p.horaAnalise ? 'ANÁLISE' : 'ENTRADA')}: ${tempoParaCertificacao} min`);
-        }
-        
-        // Adicionar células à linha - USANDO formatarHoraTempo corrigida
-        tr.innerHTML = `
-            <td class="text-center tv-hide-column">${p.dataFormatada}</td>
-            <td class="text-center" id="${tempoTotalId}">${formatarTempo(p.tempoTotal, true, p.tempoEmTempoReal)}</td>
-            <td class="text-center">${formatarHora(p.horaEntrada)}</td>
-            <td class="text-center">${p.numero}</td>
-            <td class="cedente-cell ${temObservacoes ? 'has-observations' : ''}" data-proposta-id="${p.id}">${p.cedente}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaAnalise, p.tempoAteAnalise, p.tempoAteAnaliseOriginal)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPendencia, p.tempoAnaliseAtePendencia, p.tempoAnaliseAtePendenciaOriginal)}</td>
-            <td class="text-center">${formatarHoraTempo(horaChecagem, tempoAteChecagem, null)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaCertifica, p.tempoEtapaAnteriorAteCertifica, p.tempoEtapaAnteriorAteCertificaOriginal)}</td>
-            <td class="text-center">${formatarHoraTempo(p.horaPagamento, p.tempoCertificaAtePagamento, p.tempoCertificaAtePagamentoOriginal)}</td>
-            <td class="text-center status-cell" data-proposta-id="${p.id}">${p.statusSimplificado}</td>
-        `;
-        
-        // Adicionar a linha à tabela
-        tbody.appendChild(tr);
-        
-        // Configurar timer para tempo real se necessário
-        if (p.tempoEmTempoReal && p.horaEntrada) {
-            const dataEntrada = new Date(p.horaEntrada);
-            const timer = setInterval(() => {
-                const agora = new Date();
-                let tempoDecorrido = Math.floor((agora - dataEntrada) / (1000 * 60));
                 
-                // Aplicar desconto de horário de almoço se necessário
-                const horaEntrada = dataEntrada.getHours();
-                const entrouAntesDas13 = horaEntrada < 13;
-                const horaAtual = agora.getHours();
-                const passouDas13 = horaAtual > 13 || (horaAtual === 13 && minutoAtual > 0);
+                const formatarHora = window.formatarHora || ((data) => {
+                    if (!data) return '--';
+                    try {
+                        return new Date(data).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    } catch (error) {
+                        return '--';
+                    }
+                });
                 
-                if (entrouAntesDas13 && passouDas13) {
-                    tempoDecorrido -= 60;
-                }
+                tr.innerHTML = `
+                    <td class="text-center tv-hide-column">${p.dataFormatada || '--'}</td>
+                    <td class="text-center">${formatarTempo(p.tempoTotal)}</td>
+                    <td class="text-center">${formatarHora(p.horaEntrada)}</td>
+                    <td class="text-center">${p.numero || '--'}</td>
+                    <td class="cedente-cell" data-proposta-id="${p.id}">${p.cedente || '--'}</td>
+                    <td class="text-center">${formatarHora(p.horaAnalise)}</td>
+                    <td class="text-center">${formatarHora(p.horaPendencia)}</td>
+                    <td class="text-center">--</td>
+                    <td class="text-center">${formatarHora(p.horaCertifica)}</td>
+                    <td class="text-center">${formatarHora(p.horaPagamento)}</td>
+                    <td class="text-center status-cell" data-proposta-id="${p.id}">${p.statusSimplificado || '--'}</td>
+                `;
                 
-                const tempoTotalCell = document.getElementById(tempoTotalId);
-                if (tempoTotalCell) {
-                    tempoTotalCell.innerHTML = formatarTempo(tempoDecorrido, true, true);
-                }
-            }, 60000);
-            
-            window.tempoRealTimers.push(timer);
-        }
-    });
-    
-    // CONFIGURAR EVENT LISTENERS APÓS RENDERIZAR A TABELA
-    configurarEventListenersTabela();
-    
-    console.log(`Tabela renderizada com ${propostasFiltradas.length} propostas.`);
-}
-
-// NOVA FUNÇÃO para configurar event listeners da tabela
-function configurarEventListenersTabela() {
-    console.log('Configurando event listeners da tabela...');
-    
-    // Event listeners para células de cedente (observações)
-    document.querySelectorAll('.cedente-cell.has-observations').forEach(cell => {
-        // Remover event listeners existentes para evitar duplicação
-        cell.replaceWith(cell.cloneNode(true));
-        
-        // Pegar a nova referência após o clone
-        const newCell = document.querySelector(`.cedente-cell[data-proposta-id="${cell.dataset.propostaId}"]`);
-        
-        if (newCell) {
-            newCell.style.cursor = 'pointer';
-            newCell.title = 'Clique para ver as observações';
-            
-            newCell.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const propostaId = newCell.dataset.propostaId;
-                const proposta = APP_STATE.propostas.find(p => p.id === propostaId);
-                
-                if (proposta) {
-                    console.log('Clicou na célula do cedente:', proposta.cedente);
-                    mostrarObservacoes(proposta);
-                } else {
-                    console.error('Proposta não encontrada:', propostaId);
-                }
+                tbody.appendChild(tr);
             });
-        }
-    });
-    
-    // Event listeners para células de status (histórico)
-    document.querySelectorAll('.status-cell').forEach(cell => {
-        // Remover event listeners existentes para evitar duplicação
-        cell.replaceWith(cell.cloneNode(true));
-        
-        // Pegar a nova referência após o clone
-        const newCell = document.querySelector(`.status-cell[data-proposta-id="${cell.dataset.propostaId}"]`);
-        
-        if (newCell) {
-            newCell.style.cursor = 'pointer';
-            newCell.title = 'Clique para ver o histórico de status';
             
-            newCell.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const propostaId = newCell.dataset.propostaId;
-                const proposta = APP_STATE.propostas.find(p => p.id === propostaId);
-                
-                if (proposta) {
-                    console.log('Clicou na célula de status:', proposta.statusSimplificado);
-                    mostrarHistoricoStatus(proposta);
-                } else {
-                    console.error('Proposta não encontrada:', propostaId);
-                }
+            console.log(`📊 Tabela renderizada com ${propostasFiltradas.length} propostas (fallback)`);
+        };
+        console.log('✅ renderizarTabela fallback criado');
+    }
+    
+    // Fallback para atualizarEstatisticas
+    if (typeof window.atualizarEstatisticas !== 'function') {
+        window.atualizarEstatisticas = function(propostasFiltradas) {
+            if (!Array.isArray(propostasFiltradas)) return;
+            
+            const totalElement = document.getElementById('total-propostas');
+            const pagasElement = document.getElementById('total-pagas');
+            const processamentoElement = document.getElementById('total-processamento');
+            
+            if (totalElement) totalElement.textContent = propostasFiltradas.length;
+            
+            const propostasPagas = propostasFiltradas.filter(p => p.statusSimplificado === "PAGO");
+            if (pagasElement) pagasElement.textContent = propostasPagas.length;
+            
+            const propostasEmProcessamento = propostasFiltradas.filter(p => {
+                return p.statusSimplificado !== "PAGO" && 
+                       p.statusSimplificado !== "CEDENTE DESISTIU" && 
+                       p.statusSimplificado !== "RECUSADO" &&
+                       p.statusSimplificado !== "POSTERGADO";
             });
-        }
-    });
+            
+            if (processamentoElement) processamentoElement.textContent = propostasEmProcessamento.length;
+            
+            console.log(`📊 Estatísticas atualizadas (fallback): ${propostasFiltradas.length} total, ${propostasPagas.length} pagas`);
+        };
+        console.log('✅ atualizarEstatisticas fallback criado');
+    }
     
-    console.log('Event listeners da tabela configurados.');
+    // Fallback para mostrarObservacoes
+    if (typeof window.mostrarObservacoes !== 'function') {
+        window.mostrarObservacoes = function(proposta) {
+            if (!proposta) return;
+            
+            const observacoes = proposta.observacoes || [];
+            const texto = observacoes.length > 0 ? 
+                observacoes.map(obs => `${obs.USUARIO}: ${obs.OBSERVACAO}`).join('\n') :
+                'Nenhuma observação encontrada';
+            
+            alert(`Observações - ${proposta.cedente} (${proposta.numero}):\n\n${texto}`);
+        };
+        console.log('✅ mostrarObservacoes fallback criado');
+    }
+    
+    // Fallback para mostrarHistoricoStatus
+    if (typeof window.mostrarHistoricoStatus !== 'function') {
+        window.mostrarHistoricoStatus = function(proposta) {
+            if (!proposta) return;
+            
+            const fluxo = proposta.fluxoCompleto || [];
+            const texto = fluxo.length > 0 ?
+                fluxo.map(f => `${f.STATUS_FLUXO} - ${new Date(f.DATA_HORA_ENTRADA).toLocaleString('pt-BR')}`).join('\n') :
+                'Nenhum histórico encontrado';
+            
+            alert(`Histórico - ${proposta.cedente} (${proposta.numero}):\n\n${texto}`);
+        };
+        console.log('✅ mostrarHistoricoStatus fallback criado');
+    }
+    
+    // Marcar como carregado
+    window.uiComponentesCarregados = true;
+    console.log('✅ Fallbacks básicos criados e sistema funcional');
 }
 
-// Função para ajustar o cabeçalho da tabela no modo TV - com tooltip explicativo
-function ajustarCabecalhoTabelaModoTV() {
-    const thead = document.querySelector('#propostas-table thead');
-    if (!thead) {
-        console.error('Cabeçalho da tabela não encontrado');
-        return;
-    }
-    
-    const headerRow = thead.querySelector('tr');
-    if (!headerRow) {
-        console.error('Linha do cabeçalho não encontrada');
-        return;
-    }
-    
-    // Verificar se já está no formato do modo TV
-    if (headerRow.classList.contains('tv-mode-header-row')) {
-        console.log('Cabeçalho já está no formato do modo TV');
-        return;
-    }
-    
-    // Salvar o cabeçalho original se ainda não foi salvo
-    if (!thead.getAttribute('data-original-html')) {
-        thead.setAttribute('data-original-html', thead.innerHTML);
-    }
-    
-    // Criar um novo cabeçalho para o modo TV com tooltip explicativo
-    const newHeaderHTML = `
-        <tr class="tv-mode-header-row">
-            <th class="sortable text-center" data-sort="tempo_total">Tempo Total<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="hora_entrada">ENTRADA GER<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="numero">Nº<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="cedente">Cedente<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="analise">ANALISTA AUTO<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="pendencia">PENDÊNCIA<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="checagem">CHECAGEM<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="certificacao" title="Tempo desde a última etapa (Pendência ou Análise) até a Certificação">QCERT.<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="pagamento">PAGO<span class="sort-icon"></span></th>
-            <th class="sortable text-center" data-sort="status">Status<span class="sort-icon"></span></th>
-        </tr>
-    `;
-    
-    thead.innerHTML = newHeaderHTML;
-    
-    // Reconfigurar a ordenação por clique nos cabeçalhos
-    if (typeof configurarOrdenacaoPorCabecalho === 'function') {
-        configurarOrdenacaoPorCabecalho();
-    }
-    
-    console.log('Cabeçalho da tabela ajustado para o modo TV');
-}
-
-// Função para restaurar o cabeçalho original da tabela
-function restaurarCabecalhoTabelaOriginal() {
-    const thead = document.querySelector('#propostas-table thead');
-    if (!thead) {
-        console.error('Cabeçalho da tabela não encontrado');
-        return;
-    }
-    
-    // Restaurar o cabeçalho original se foi salvo
-    const originalHTML = thead.getAttribute('data-original-html');
-    if (originalHTML) {
-        thead.innerHTML = originalHTML;
-        
-        // Reconfigurar a ordenação por clique nos cabeçalhos
-        if (typeof configurarOrdenacaoPorCabecalho === 'function') {
-            configurarOrdenacaoPorCabecalho();
-        }
-        
-        console.log('Cabeçalho da tabela restaurado para o modo normal');
-    }
-}
-
-// Função separada para alternar o modo TV (facilita a remoção do event listener)
-function alternarModoTV() {
-    console.log('Botão de modo TV clicado');
-    document.body.classList.toggle('tv-mode');
-    
-    // Atualizar o texto do botão
-    const botaoTV = document.getElementById('tv-mode-toggle');
-    if (document.body.classList.contains('tv-mode')) {
-        botaoTV.innerHTML = '<i class="fas fa-desktop"></i> Modo Normal';
-    } else {
-        botaoTV.innerHTML = '<i class="fas fa-tv"></i> Modo TV';
-    }
-    
-    // Salvar a preferência
-    const novoEstado = document.body.classList.contains('tv-mode') ? 'ativo' : 'inativo';
-    localStorage.setItem('modo-tv', novoEstado);
-    
-    // Forçar um redimensionamento da tabela
-    setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-    }, 100);
-}
-
-// Garantant que a função seja chamada quando o DOM estiver carregado
+// Auto-executar
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', configurarModoTV);
+    document.addEventListener('DOMContentLoaded', inicializarComponentes);
 } else {
-    configurarModoTV();
+    inicializarComponentes();
 }
 
-// Função para mostrar as observações de uma proposta - sem estilização especial para comentários automáticos
-function mostrarObservacoes(proposta) {
-    console.log("Mostrando observações para:", proposta.id, proposta.cedente);
-    console.log("Observações:", proposta.observacoes);
-    
-    // Remover qualquer tooltip existente
-    const existingTooltip = document.querySelector('.observations-tooltip');
-    if (existingTooltip) {
-        existingTooltip.remove();
-    }
-    
-    // Criar o tooltip
-    const tooltip = document.createElement('div');
-    tooltip.className = 'observations-tooltip';
-    tooltip.style.display = 'block'; // Garantir que esteja visível
-    
-    // Criar o cabeçalho do tooltip
-    const header = document.createElement('div');
-    header.className = 'observations-tooltip-header';
-    
-    const title = document.createElement('div');
-    title.className = 'observations-tooltip-title';
-    title.textContent = `Observações - ${proposta.cedente} (${proposta.numero})`;
-    
-    const closeButton = document.createElement('button');
-    closeButton.className = 'observations-tooltip-close';
-    closeButton.innerHTML = '&times;';
-    closeButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        tooltip.remove();
-    });
-    
-    header.appendChild(title);
-    header.appendChild(closeButton);
-    tooltip.appendChild(header);
-    
-    // Adicionar as observações
-    const content = document.createElement('div');
-    content.className = 'observations-content';
-    
-    if (proposta.observacoes && proposta.observacoes.length > 0) {
-        // Ordenar observações por data (mais recentes primeiro)
-        const observacoesOrdenadas = [...proposta.observacoes].sort((a, b) => {
-            if (!a.DATA_HORA || !b.DATA_HORA) return 0;
-            return new Date(b.DATA_HORA) - new Date(a.DATA_HORA);
-        });
-        
-        observacoesOrdenadas.forEach(obs => {
-            const item = document.createElement('div');
-            item.className = 'observation-item';
-            
-            const user = document.createElement('div');
-            user.className = 'observation-user';
-            user.textContent = obs.USUARIO || 'Desconhecido';
-            
-            const text = document.createElement('div');
-            text.className = 'observation-text';
-            text.textContent = obs.OBSERVACAO || '';
-            
-            item.appendChild(user);
-            item.appendChild(text);
-            content.appendChild(item);
-        });
-    } else {
-        const noObs = document.createElement('div');
-        noObs.textContent = 'Sem observações';
-        content.appendChild(noObs);
-    }
-    
-    tooltip.appendChild(content);
-    
-    // Adicionar o tooltip ao DOM
-    document.body.appendChild(tooltip);
-    
-    // Posicionar o tooltip em relação à célula
-    const cedenteCell = document.querySelector(`.cedente-cell[data-proposta-id="${proposta.id}"]`);
-    if (cedenteCell) {
-        // Obter as dimensões e posições
-        const cellRect = cedenteCell.getBoundingClientRect();
-        const tooltipRect = tooltip.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-        
-        // Calcular a posição inicial (abaixo da célula)
-        let top = cellRect.bottom + 10;
-        let left = cellRect.left + (cellRect.width / 2) - (tooltipRect.width / 2);
-        
-        // Verificar se o tooltip sai da tela na parte inferior
-        if (top + tooltipRect.height > viewportHeight) {
-            // Posicionar acima da célula se não couber abaixo
-            top = cellRect.top - tooltipRect.height - 10;
-            
-            // Se ainda estiver fora da tela, posicionar no topo da viewport com margem
-            if (top < 0) {
-                top = 10;
-            }
-        }
-        
-        // Verificar se o tooltip sai da tela à direita
-        if (left + tooltipRect.width > viewportWidth) {
-            left = viewportWidth - tooltipRect.width - 10;
-        }
-        
-        // Verificar se o tooltip sai da tela à esquerda
-        if (left < 0) {
-            left = 10;
-        }
-        
-        // Aplicar a posição
-        tooltip.style.position = 'fixed';
-        tooltip.style.top = `${top}px`;
-        tooltip.style.left = `${left}px`;
-        tooltip.style.maxHeight = `${viewportHeight - 40}px`; // Limitar altura máxima
-        tooltip.style.overflowY = 'auto'; // Permitir rolagem se o conteúdo for muito grande
-        
-        console.log("Tooltip posicionado:", tooltip.style.top, tooltip.style.left);
-        
-        // Fechar o tooltip ao clicar fora dele
-        setTimeout(() => {
-            document.addEventListener('click', function closeTooltip(e) {
-                if (!tooltip.contains(e.target) && !cedenteCell.contains(e.target)) {
-                    tooltip.remove();
-                    document.removeEventListener('click', closeTooltip);
-                }
-            });
-        }, 100);
-        
-        // Fechar o tooltip ao pressionar ESC
-        document.addEventListener('keydown', function escKeyHandler(e) {
-            if (e.key === 'Escape') {
-                tooltip.remove();
-                document.removeEventListener('keydown', escKeyHandler);
-            }
-        });
-    } else {
-        console.error("Célula do cedente não encontrada:", proposta.id);
-        tooltip.remove();
-    }
-}
+// Expor função globalmente
+window.inicializarComponentesUI = inicializarComponentes;
 
-// Função para mostrar o histórico de status de uma proposta - versão ultra compacta sem espaçamento
-function mostrarHistoricoStatus(proposta) {
-    // Remover qualquer tooltip existente
-    const existingTooltip = document.querySelector('.status-history-tooltip');
-    if (existingTooltip) {
-        existingTooltip.remove();
-    }
-    
-    // Criar o tooltip
-    const tooltip = document.createElement('div');
-    tooltip.className = 'status-history-tooltip';
-    tooltip.style.display = 'block';
-    
-    // Criar o cabeçalho do tooltip
-    const header = document.createElement('div');
-    header.className = 'status-history-tooltip-header';
-    
-    // Truncar o nome do cedente se for muito longo
-    let nomeCedente = proposta.cedente;
-    if (nomeCedente.length > 15) {
-        nomeCedente = nomeCedente.substring(0, 13) + '...';
-    }
-    
-    const title = document.createElement('div');
-    title.className = 'status-history-tooltip-title';
-    title.textContent = `${proposta.numero} - ${nomeCedente}`;
-    
-    const closeButton = document.createElement('button');
-    closeButton.className = 'status-history-tooltip-close';
-    closeButton.innerHTML = '×';
-    closeButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        tooltip.remove();
-    });
-    
-    header.appendChild(title);
-    header.appendChild(closeButton);
-    tooltip.appendChild(header);
-    
-    // Adicionar o histórico de status
-    const content = document.createElement('div');
-    content.className = 'status-history-content';
-    
-    if (proposta.fluxoCompleto && proposta.fluxoCompleto.length > 0) {
-        // Ordenar o fluxo por data/hora (mais antigo primeiro)
-        const fluxoOrdenado = [...proposta.fluxoCompleto].sort((a, b) => {
-            return new Date(a.DATA_HORA_ENTRADA) - new Date(b.DATA_HORA_ENTRADA);
-        });
-        
-        // Criar uma lista simples em vez de tabela
-        const historyList = document.createElement('div');
-        historyList.className = 'history-list';
-        
-        // Adicionar cada entrada do fluxo
-        let entradaAnterior = null;
-        
-        fluxoOrdenado.forEach((entrada, index) => {
-            // Simplificar o status
-            const statusSimplificado = simplificarStatus(entrada.STATUS_FLUXO);
-            
-            // Formatar a data/hora (apenas hora e minuto)
-            const dataHora = formatarHora(entrada.DATA_HORA_ENTRADA);
-            
-            // Calcular o tempo desde a entrada anterior
-            let tempoDesdeAnterior = '';
-            if (entradaAnterior) {
-                const tempoMinutos = calcularTempoEmMinutos(entradaAnterior.DATA_HORA_ENTRADA, entrada.DATA_HORA_ENTRADA);
-                // Formato compacto para o tempo
-                if (tempoMinutos < 60) {
-                    tempoDesdeAnterior = `${tempoMinutos}m`;
-                } else {
-                    const horas = Math.floor(tempoMinutos / 60);
-                    const min = tempoMinutos % 60;
-                    tempoDesdeAnterior = min > 0 ? `${horas}h${min}m` : `${horas}h`;
-                }
-            } else {
-                tempoDesdeAnterior = '-';
-            }
-            
-            // Adicionar classe para destacar o status atual
-            const isStatusAtual = index === fluxoOrdenado.length - 1;
-            const statusClass = isStatusAtual ? 'status-atual' : '';
-            
-            // Criar um item de lista com formato compacto
-            const item = document.createElement('div');
-            item.className = 'history-item';
-            item.innerHTML = `
-                <span class="${statusClass}">${statusSimplificado}</span>
-                <span>${dataHora}</span>
-                <span>${tempoDesdeAnterior}</span>
-            `;
-            
-            historyList.appendChild(item);
-            
-            // Atualizar a entrada anterior para o próximo cálculo
-            entradaAnterior = entrada;
-        });
-        
-        content.appendChild(historyList);
-    } else {
-        const noHistory = document.createElement('div');
-        noHistory.className = 'no-history';
-        noHistory.textContent = 'Sem histórico';
-        content.appendChild(noHistory);
-    }
-    
-    tooltip.appendChild(content);
-    
-    // Adicionar o tooltip ao DOM
-    document.body.appendChild(tooltip);
-    
-    // Posicionar o tooltip em relação à célula
-    const statusCell = document.querySelector(`.status-cell[data-proposta-id="${proposta.id}"]`);
-    if (statusCell) {
-        // Obter as dimensões e posições
-        const cellRect = statusCell.getBoundingClientRect();
-        const tooltipRect = tooltip.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-        
-        // Calcular a posição inicial (abaixo da célula)
-        let top = cellRect.bottom + 5;
-        let left = cellRect.left + (cellRect.width / 2) - (tooltipRect.width / 2);
-        
-        // Verificar se o tooltip sai da tela na parte inferior
-        if (top + tooltipRect.height > viewportHeight) {
-            // Posicionar acima da célula se não couber abaixo
-            top = cellRect.top - tooltipRect.height - 5;
-            
-            // Se ainda estiver fora da tela, posicionar no topo da viewport com margem
-            if (top < 0) {
-                top = 5;
-            }
-        }
-        
-        // Verificar se o tooltip sai da tela à direita
-        if (left + tooltipRect.width > viewportWidth) {
-            left = viewportWidth - tooltipRect.width - 5;
-        }
-        
-        // Verificar se o tooltip sai da tela à esquerda
-        if (left < 0) {
-            left = 5;
-        }
-        
-        // Aplicar a posição
-        tooltip.style.position = 'fixed';
-        tooltip.style.top = `${top}px`;
-        tooltip.style.left = `${left}px`;
-        tooltip.style.maxHeight = `${viewportHeight - 20}px`;
-        tooltip.style.overflowY = 'auto';
-        
-        // Fechar o tooltip ao clicar fora dele
-        setTimeout(() => {
-            document.addEventListener('click', function closeTooltip(e) {
-                if (!tooltip.contains(e.target) && !statusCell.contains(e.target)) {
-                    tooltip.remove();
-                    document.removeEventListener('click', closeTooltip);
-                }
-            });
-        }, 0);
-        
-        // Fechar o tooltip ao pressionar ESC
-        document.addEventListener('keydown', function escKeyHandler(e) {
-            if (e.key === 'Escape') {
-                tooltip.remove();
-                document.removeEventListener('keydown', escKeyHandler);
-            }
-        });
-    } else {
-        console.error("Célula de status não encontrada:", proposta.id);
-        tooltip.remove();
-    }
-}
+console.log('🔧 UI Components carregado');

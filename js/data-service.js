@@ -517,164 +517,105 @@ function calcularTempoComDescontoAlmoco(dataInicio, dataFim = null) {
 // Tornar a função global para uso em outros arquivos
 window.calcularTempoComDescontoAlmoco = calcularTempoComDescontoAlmoco;
 
-// Modificar a função filtrarPropostas para incluir o filtro por usuário e torná-la global
-window.filtrarPropostas = function() {
-    // Obter os valores dos filtros
-    const statusFiltro = document.getElementById('status-filter').value;
-    const cedenteFiltro = document.getElementById('cedente-filter').value.toLowerCase();
-    const usuarioFiltro = document.getElementById('usuario-filter')?.value || 'todos';
-    
-    // Log para depuração
-    console.log(`Filtrando propostas - Status: ${statusFiltro}, Cedente: ${cedenteFiltro}, Usuário: ${usuarioFiltro}`);
-    
-    // Verificar se APP_STATE e APP_STATE.propostas existem
-    if (!window.APP_STATE || !Array.isArray(window.APP_STATE.propostas)) {
-        console.error("APP_STATE ou APP_STATE.propostas não estão disponíveis");
-        return [];
-    }
-    
-    // Filtrar as propostas com base nos critérios
-    return window.APP_STATE.propostas.filter(proposta => {
-        // Filtro de status
-        const passaFiltroStatus = statusFiltro === 'todos' || proposta.statusAtual === statusFiltro || proposta.statusSimplificado === statusFiltro;
+// Modificar a função filtrarPropostas para não sobrescrever se já existir
+if (typeof window.filtrarPropostas !== 'function') {
+    window.filtrarPropostas = function() {
+        // Obter os valores dos filtros
+        const statusFiltro = document.getElementById('status-filter').value;
+        const cedenteFiltro = document.getElementById('cedente-filter').value.toLowerCase();
+        const usuarioFiltro = document.getElementById('usuario-filter')?.value || 'todos';
         
-        // Filtro de cedente
-        const passaFiltroCedente = cedenteFiltro === '' || proposta.cedente.toLowerCase().includes(cedenteFiltro);
+        console.log(`Data-service filtrarPropostas - Status: ${statusFiltro}, Cedente: ${cedenteFiltro}, Usuário: ${usuarioFiltro}`);
         
-        // Filtro de usuário
-        let passaFiltroUsuario = true;
-        if (usuarioFiltro !== 'todos' && window.CedenteService && typeof window.CedenteService.cedenteAssociadoAoUsuario === 'function') {
-            passaFiltroUsuario = window.CedenteService.cedenteAssociadoAoUsuario(proposta.cedente, usuarioFiltro);
+        if (!APP_STATE || !APP_STATE.propostas) {
+            return [];
         }
         
-        // Retornar true apenas se passar por todos os filtros
-        return passaFiltroStatus && passaFiltroCedente && passaFiltroUsuario;
-    });
-};
+        return APP_STATE.propostas.filter(proposta => {
+            // Filtro de status
+            const passaFiltroStatus = statusFiltro === 'todos' || 
+                proposta.statusAtual === statusFiltro || 
+                proposta.statusSimplificado === statusFiltro;
+            
+            // Filtro de cedente
+            const passaFiltroCedente = cedenteFiltro === '' || 
+                proposta.cedente.toLowerCase().includes(cedenteFiltro);
+            
+            // Filtro de usuário
+            let passaFiltroUsuario = true;
+            if (usuarioFiltro !== 'todos' && window.CedenteService && 
+                typeof window.CedenteService.cedenteAssociadoAoUsuario === 'function') {
+                passaFiltroUsuario = window.CedenteService.cedenteAssociadoAoUsuario(proposta.cedente, usuarioFiltro);
+            }
+            
+            return passaFiltroStatus && passaFiltroCedente && passaFiltroUsuario;
+        });
+    };
+}
 
-// Tornar a função ordenarPropostas global
-window.ordenarPropostas = function(propostas) {
-    // Verificar se propostas é um array
-    if (!Array.isArray(propostas)) {
-        console.error("ordenarPropostas: propostas não é um array");
-        return [];
-    }
-    
-    // Obter o critério de ordenação atual
-    const ordenacao = window.APP_STATE?.ordenacao || 'data_desc';
-    
-    // Criar uma cópia do array para não modificar o original
-    const propostasOrdenadas = [...propostas];
-    
-    // Ordenar com base no critério selecionado
-    switch (ordenacao) {
-        case 'data_desc':
-            propostasOrdenadas.sort((a, b) => new Date(b.data) - new Date(a.data));
-            break;
-        case 'data_asc':
-            propostasOrdenadas.sort((a, b) => new Date(a.data) - new Date(b.data));
-            break;
-        case 'tempo_total_desc':
-            propostasOrdenadas.sort((a, b) => (b.tempoTotal || 0) - (a.tempoTotal || 0));
-            break;
-        case 'tempo_total_asc':
-            propostasOrdenadas.sort((a, b) => (a.tempoTotal || 0) - (b.tempoTotal || 0));
-            break;
-        case 'hora_entrada_desc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaEntrada) return 1;
-                if (!b.horaEntrada) return -1;
-                return new Date(b.horaEntrada) - new Date(a.horaEntrada);
-            });
-            break;
-        case 'hora_entrada_asc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaEntrada) return 1;
-                if (!b.horaEntrada) return -1;
-                return new Date(a.horaEntrada) - new Date(b.horaEntrada);
-            });
-            break;
-        case 'numero_desc':
-            propostasOrdenadas.sort((a, b) => parseInt(b.numero) - parseInt(a.numero));
-            break;
-        case 'numero_asc':
-            propostasOrdenadas.sort((a, b) => parseInt(a.numero) - parseInt(b.numero));
-            break;
-        case 'cedente_asc':
-            propostasOrdenadas.sort((a, b) => a.cedente.localeCompare(b.cedente));
-            break;
-        case 'cedente_desc':
-            propostasOrdenadas.sort((a, b) => b.cedente.localeCompare(a.cedente));
-            break;
-        case 'analise_desc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaAnalise) return 1;
-                if (!b.horaAnalise) return -1;
-                return new Date(b.horaAnalise) - new Date(a.horaAnalise);
-            });
-            break;
-        case 'analise_asc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaAnalise) return 1;
-                if (!b.horaAnalise) return -1;
-                return new Date(a.horaAnalise) - new Date(b.horaAnalise);
-            });
-            break;
-        case 'checagem_desc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaChecagem) return 1;
-                if (!b.horaChecagem) return -1;
-                return new Date(b.horaChecagem) - new Date(a.horaChecagem);
-            });
-            break;
-        case 'checagem_asc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaChecagem) return 1;
-                if (!b.horaChecagem) return -1;
-                return new Date(a.horaChecagem) - new Date(b.horaChecagem);
-            });
-            break;
-        case 'certificacao_desc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaCertifica) return 1;
-                if (!b.horaCertifica) return -1;
-                return new Date(b.horaCertifica) - new Date(a.horaCertifica);
-            });
-            break;
-        case 'certificacao_asc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaCertifica) return 1;
-                if (!b.horaCertifica) return -1;
-                return new Date(a.horaCertifica) - new Date(b.horaCertifica);
-            });
-            break;
-        case 'pagamento_desc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaPagamento) return 1;
-                if (!b.horaPagamento) return -1;
-                return new Date(b.horaPagamento) - new Date(a.horaPagamento);
-            });
-            break;
-        case 'pagamento_asc':
-            propostasOrdenadas.sort((a, b) => {
-                if (!a.horaPagamento) return 1;
-                if (!b.horaPagamento) return -1;
-                return new Date(a.horaPagamento) - new Date(b.horaPagamento);
-            });
-            break;
-        case 'status_asc':
-            propostasOrdenadas.sort((a, b) => a.pesoStatus - b.pesoStatus);
-            break;
-        case 'status_desc':
-            propostasOrdenadas.sort((a, b) => b.pesoStatus - a.pesoStatus);
-            break;
-        default:
-            // Ordenação padrão por data (mais recente primeiro)
-            propostasOrdenadas.sort((a, b) => new Date(b.data) - new Date(a.data));
-    }
-    
-    return propostasOrdenadas;
-};
+// Modificar a função ordenarPropostas para não sobrescrever se já existir
+if (typeof window.ordenarPropostas !== 'function') {
+    window.ordenarPropostas = function(propostas) {
+        if (!Array.isArray(propostas)) {
+            console.error("Data-service ordenarPropostas: propostas não é um array");
+            return [];
+        }
+        
+        const ordenacao = APP_STATE.ordenacao;
+        console.log(`Data-service ordenarPropostas por: ${ordenacao}`);
+        
+        return [...propostas].sort((a, b) => {
+            switch (ordenacao) {
+                case 'numero_desc':
+                    return b.numero - a.numero;
+                case 'numero_asc':
+                    return a.numero - b.numero;
+                case 'hora_entrada_desc':
+                    return compareDates(b.horaEntrada, a.horaEntrada);
+                case 'hora_entrada_asc':
+                    return compareDates(a.horaEntrada, b.horaEntrada);
+                case 'status_asc':
+                    return a.pesoStatus - b.pesoStatus;
+                case 'status_desc':
+                    return b.pesoStatus - a.pesoStatus;
+                case 'data_desc':
+                    return compareDates(b.data, a.data);
+                case 'data_asc':
+                    return compareDates(a.data, b.data);
+                case 'cedente_asc':
+                    return a.cedente.localeCompare(b.cedente);
+                case 'cedente_desc':
+                    return b.cedente.localeCompare(a.cedente);
+                case 'tempo_total_desc':
+                    return compareNumbers(b.tempoTotal, a.tempoTotal);
+                case 'tempo_total_asc':
+                    return compareNumbers(a.tempoTotal, b.tempoTotal);
+                case 'analise_desc':
+                    return compareDates(b.horaAnalise, a.horaAnalise);
+                case 'analise_asc':
+                    return compareDates(a.horaAnalise, b.horaAnalise);
+                case 'checagem_desc':
+                    return compareDates(b.horaChecagem, a.horaChecagem);
+                case 'checagem_asc':
+                    return compareDates(a.horaChecagem, b.horaChecagem);
+                case 'certificacao_desc':
+                    return compareDates(b.horaCertifica, a.horaCertifica);
+                case 'certificacao_asc':
+                    return compareDates(a.horaCertifica, b.horaCertifica);
+                case 'pagamento_desc':
+                    return compareDates(b.horaPagamento, a.horaPagamento);
+                case 'pagamento_asc':
+                    return compareDates(a.horaPagamento, b.horaPagamento);
+                case 'pendencia_desc':
+                    return ordenarPorData(b.horaPendencia, a.horaPendencia);
+                case 'pendencia_asc':
+                    return ordenarPorData(a.horaPendencia, b.horaPendencia);
+                default:
+                    return 0;
+            }
+        });
+    };
+}
 
 // Tornar a função calcularSomaValoresAprovados global
 window.calcularSomaValoresAprovados = calcularSomaValoresAprovados;
